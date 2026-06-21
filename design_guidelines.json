@@ -1,0 +1,94 @@
+{
+  "theme": "LIGHT",
+  "archetype": "Archetype 4 (Swiss & High-Contrast)",
+  "emotional_tone": "Authoritative, functional, elite, and highly pragmatic.",
+  "color_palette": {
+    "background": "#FAFAFA",
+    "surface": "#FFFFFF",
+    "text_primary": "#0A0A0A",
+    "text_secondary": "#525252",
+    "accent_primary": "#FF3B30",
+    "accent_secondary": "#002FA7",
+    "border": "#1A1A1A",
+    "rules": "Never use pure #000000 or #808080. The palette must feel like an engineering blueprint or architectural document."
+  },
+  "typography": {
+    "heading_font": "Outfit",
+    "body_font": "JetBrains Mono",
+    "hierarchy": {
+      "h1": "text-5xl sm:text-6xl font-black tracking-tighter uppercase",
+      "h2": "text-3xl sm:text-4xl font-bold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-bold",
+      "body": "text-base font-normal leading-relaxed",
+      "labels_and_overlines": "text-xs font-bold uppercase tracking-[0.2em]"
+    },
+    "rules": "No Inter. No Roboto. Headings MUST have tight tracking. Overlines MUST be uppercase and wide."
+  },
+  "spacing_and_layout": {
+    "philosophy": "Generous Spacing paired with strict grids. Elements must have high contrast and clear boundaries.",
+    "grid_system": "Grid Borders (The 'Technical' Look). Expose the skeleton. Containers use border-collapse style layout.",
+    "bento_mode": "MODE B: The 'Control Room' Grid for dashboards. Tight gaps (gap-4 or gap-0 if using border collapse).",
+    "radii": "rounded-none (sharp edges only)",
+    "borders": "border border-[#1A1A1A]"
+  },
+  "components": {
+    "buttons": "Flat, pure geometric. bg-[#FF3B30] text-white border border-[#1A1A1A]. Hover: bg-[#0A0A0A] text-white.",
+    "cards": "Surface #FFFFFF, hard 1px border-[#1A1A1A], no shadow. Hover: slight lift (-translate-y-1) and sharp solid offset shadow (shadow-[4px_4px_0px_#1A1A1A]).",
+    "inputs": "Shadcn components heavily customized: rounded-none, border-b-2 border-x-0 border-t-0 border-[#1A1A1A] bg-transparent focus-visible:ring-0 focus-visible:border-[#FF3B30]",
+    "kanban_board": "Strict vertical columns. 1px borders between columns. Tasks are dense, rectangular, high contrast.",
+    "glassmorphism": "FORBIDDEN for this archetype. Use solid backgrounds.",
+    "icons": "Use @phosphor-icons/react. Duotone for marketing, Bold for dashboard."
+  },
+  "pages_and_features": {
+    "landing_page": "High visual impact. Use the abstract grid paper background. Large 'Outfit' headings. Asymmetric bento layout for startup features.",
+    "startup_listing": "Dense bento grid of startup cards. Geometric logos, clear tags (JetBrains Mono) for tech stack.",
+    "startup_detail_and_kanban": "Control room layout. The task board should look like an engineering command center. Clear states (Open, Progress, Review, Completed).",
+    "github_submission": "Modal or slide-over with strict form layout. Paste PR URL, notes. Brutalist success/error states.",
+    "verified_experience_profile": "Designed to look like a printable, high-end engineering certificate. Mostly monochrome with red/blue accents for 'Verified' stamps."
+  },
+  "media": {
+    "hero_background": {
+      "url": "https://images.pexels.com/photos/7598250/pexels-photo-7598250.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Minimalist grid pattern on white paper. Use as a subtle background texture to reinforce the engineering/blueprint feel."
+    },
+    "startup_logos": [
+      {
+        "url": "https://images.unsplash.com/photo-1638864616270-64041b699a50?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxNzV8MHwxfHNlYXJjaHw0fHxhYnN0cmFjdCUyMGdlb21ldHJpYyUyMHRlY2glMjBzdGFydHVwJTIwbG9nb3xlbnwwfHx8fDE3ODIwMzc0ODd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Abstract black and white geometric logo for a featured virtual startup."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1689443111384-1cf214df988a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxNzV8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGdlb21ldHJpYyUyMHRlY2glMjBzdGFydHVwJTIwbG9nb3xlbnwwfHx8fDE3ODIwMzc0ODd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Abstract dark background with orange and red pattern for a startup logo."
+      }
+    ],
+    "student_avatars": [
+      {
+        "url": "https://images.unsplash.com/photo-1513258496099-48168024aec0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwyfHxlbmdpbmVlcmluZyUyMHN0dWRlbnQlMjB3b3JraW5nJTIwbGFwdG9wfGVufDB8fHx8MTc4MjAzNzQ4N3ww&ixlib=rb-4.1.0&q=85",
+        "description": "Student working on laptop - Use for user profiles or testimonial sections."
+      },
+      {
+        "url": "https://images.pexels.com/photos/4974910/pexels-photo-4974910.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Focused student engaged in programming. Perfect for dashboard profile picture."
+      }
+    ]
+  },
+  "testing_attributes": {
+    "rule": "All interactive elements MUST use data-testid attributes.",
+    "examples": [
+      "data-testid='login-form-submit-button'",
+      "data-testid='startup-card-join'",
+      "data-testid='task-kanban-claim'",
+      "data-testid='github-pr-input'"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Load 'Outfit' and 'JetBrains Mono' from Google Fonts in your HTML/CSS.",
+    "Follow Archetype 4: Swiss & High-Contrast. Absolutely no soft shadows, gradients, or rounded corners. Set Tailwind rounded configs to 'none'.",
+    "Use 1px pure black (#1A1A1A) borders to divide dashboard sections instead of empty whitespace, adopting a 'Grid Borders / Technical' look.",
+    "The Kanban board must avoid standard 'floating cards'. Make the columns strict, full-height areas separated by borders, and tasks as flat, full-width bordered rectangles inside.",
+    "For Shadcn components (Dialogs, Select, Forms), strip out their default rounded corners and soft shadows to match this brutalist technical identity.",
+    "Use @phosphor-icons/react. Make sure you install it.",
+    "NEVER use placeholder text for images. Always use the media URLs provided in this JSON.",
+    "When building the Verified Experience Profile, aim for the aesthetic of a high-end printed document or engineering certificate (high contrast, distinct typography, authoritative)."
+  ]
+}
