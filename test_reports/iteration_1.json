@@ -1,0 +1,37 @@
+{
+  "summary": "First-pass smoke test of LaunchPad MVP (backend + frontend). All critical user flows pass end-to-end: auth (register + admin login + Bearer/me + logout/401 on protected), startups listing (5 seeded with tasks), apply/join, task claim, GitHub submission + auto-approve, verified profile (XP=20-30, tasks_completed=1, skills_earned populated, startups/submissions enriched), and PDF certificate download (content-type=application/pdf, body starts with %PDF). Frontend landing/register/login/dashboard/startups/kanban/profile/cert-download all work with the documented data-testids. One minor note: backend register expects `year` as a string (Pydantic v2); the React form already sends a string, so end-to-end UI register works. Posting `year: 3` (int) returns 422 — acceptable for current contract but worth flagging.",
+  "tested_scope": ["backend", "frontend", "auth", "integration"],
+  "passed": [
+    "GET /api/ -> 200 {status:ok}",
+    "GET /api/startups -> 5 startups, all with tasks_count>=2",
+    "POST /api/auth/register (year as string) -> user + Bearer token returned",
+    "GET /api/auth/me with Bearer token -> 200 with user payload",
+    "POST /api/auth/login admin@launchpad.dev -> user.role=admin, token returned",
+    "GET /api/profile/me unauthenticated -> 401",
+    "GET /api/startups/{id} -> 200; POST /api/startups/{id}/apply -> {status:accepted}; GET membership -> {joined:true}",
+    "GET /api/tasks?startup_id={id} -> seeded tasks; POST /api/tasks/{id}/claim moves task to in_progress and assigns user",
+    "POST /api/tasks/{id}/submit with github_url -> submission status=pending; POST /api/submissions/{id}/auto-approve -> status=approved",
+    "GET /api/profile/me after completion -> tasks_completed=1, experience_points=20, stats.skills_earned=['React','SSE'], startups+submissions enriched with task_title/startup_name",
+    "GET /api/profile/me/certificate -> 200, content-type application/pdf, body starts with %PDF",
+    "Frontend / -> hero-cta-register & hero-cta-login present, LAUNCHPAD branding visible",
+    "Frontend /register form (reg-name/email/password/university/major/year/submit) -> redirects to /dashboard and shows the user's name",
+    "Frontend /login admin credentials -> /dashboard shows 'LaunchPad Admin'",
+    "Frontend /startups -> 5 startup-card-{id} elements; opening detail shows kanban + tasks",
+    "Frontend startup-join-btn -> joins; task-claim-{id} -> in-progress; task-submit-{id} + submit-github-url + submit-confirm -> task auto-approved (verified via profile stats XP=30, Tasks=01, Skills=02)",
+    "Frontend nav-profile + profile-download-cert -> triggers GET /api/profile/me/certificate with 200 application/pdf"
+  ],
+  "failed": [
+    {
+      "area": "backend / register schema",
+      "issue": "POST /api/auth/register rejects `year` when sent as integer (Pydantic expects string). Frontend already sends a string so UI works, but the API contract is type-strict and undocumented.",
+      "evidence": "{'type':'string_type','loc':['body','year'],'msg':'Input should be a valid string'} on year:3 (int). Works with year:'3'.",
+      "priority": "LOW"
+    }
+  ],
+  "action_items": [
+    "Optional: accept both int and string for `year` in RegisterRequest (e.g. Union[int,str] with coercion) or document that year must be a string."
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true
+}
