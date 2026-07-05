@@ -7,7 +7,7 @@ import { Github } from "lucide-react";
 
 const ROLES = ["Frontend", "Backend", "Full-Stack", "ML", "DevOps", "Mobile", "Design"];
 const STACK = [
-  "TypeScript", "Python", "Rust", "Go", "React", "Next.js",
+  "TypeScript", "Python", "Java", "Rust", "Golang", "React", "Next.js",
   "Postgres", "Kubernetes", "PyTorch", "Swift", "Kotlin", "FastAPI",
 ];
 
