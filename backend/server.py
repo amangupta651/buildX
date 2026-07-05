@@ -506,7 +506,7 @@ async def list_tasks(startup_id: Optional[str] = None):
     q = {}
     if startup_id:
         q["startup_id"] = startup_id
-    cursor = db.tasks.find(q).sort("created_at", -1)
+    cursor = db.tasks.find(q).sort("created_at", -1).limit(500)
     return [serialize_task(t) async for t in cursor]
 
 
@@ -581,7 +581,7 @@ def serialize_submission(doc: dict) -> dict:
 @api.get("/submissions")
 async def list_submissions(mine: bool = False, user=Depends(get_current_user)):
     q = {"user_id": str(user["_id"])} if mine else {}
-    cursor = db.submissions.find(q).sort("submitted_at", -1)
+    cursor = db.submissions.find(q).sort("submitted_at", -1).limit(500)
     return [serialize_submission(s) async for s in cursor]
 
 
@@ -635,10 +635,10 @@ async def my_profile(user=Depends(get_current_user)):
     startups_map = {}
     tasks_map = {}
     if startup_id_strs:
-        async for s in db.startups.find({"_id": {"$in": [ObjectId(x) for x in startup_id_strs]}}):
+        async for s in db.startups.find({"_id": {"$in": [ObjectId(x) for x in startup_id_strs]}}).limit(500):
             startups_map[str(s["_id"])] = s
     if task_id_strs:
-        async for t in db.tasks.find({"_id": {"$in": [ObjectId(x) for x in task_id_strs]}}):
+        async for t in db.tasks.find({"_id": {"$in": [ObjectId(x) for x in task_id_strs]}}).limit(500):
             tasks_map[str(t["_id"])] = t
 
     startups = [serialize_startup(startups_map[a["startup_id"]]) for a in apps if a["startup_id"] in startups_map]
