@@ -1,188 +1,274 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import Navbar from "@/components/Navbar";
-import { ArrowRight, Rocket, GitBranch, ShieldCheck, CheckCircle, GraduationCap, Code } from "lucide-react";
+import { api } from "@/lib/api";
+import { ArrowRight, Terminal, Rocket, GitBranch, ShieldCheck, Sparkles } from "lucide-react";
+
+const STAGE_COLORS = {
+  "Pre-seed": "#22D3EE",
+  "Seed": "#A3E635",
+  "Series A": "#F472B6",
+  "Series B": "#FBBF24",
+};
+
+function DarkNav() {
+  return (
+    <nav className="sticky top-0 z-40 bg-[#0A0A0A]/80 backdrop-blur-md border-b border-white/10">
+      <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center justify-between">
+        <Link to="/" data-testid="nav-logo" className="flex items-center gap-3">
+          <div className="w-8 h-8 border border-white/25 flex items-center justify-center">
+            <span className="font-heading font-black text-white text-sm">X</span>
+          </div>
+          <div className="font-mono text-sm text-white/90">
+            <span className="text-white/50">build</span>X<span className="text-white/50">/students</span>
+          </div>
+        </Link>
+        <div className="flex items-center gap-6">
+          <Link to="/startups" className="hidden md:inline font-mono text-sm text-white/70 hover:text-white transition-colors">Startups</Link>
+          <Link to="/login" className="hidden md:inline font-mono text-sm text-white/70 hover:text-white transition-colors">Profile</Link>
+          <Link to="/login" data-testid="nav-login" className="font-mono text-sm text-white/80 hover:text-white transition-colors">Sign in</Link>
+          <Link
+            to="/register"
+            data-testid="nav-register"
+            className="font-mono text-sm bg-[#22D3EE] text-[#0A0A0A] px-4 py-2 border border-[#22D3EE] hover:bg-white hover:border-white transition-colors"
+          >
+            Join
+          </Link>
+        </div>
+      </div>
+    </nav>
+  );
+}
 
 export default function Landing() {
+  const [startups, setStartups] = useState([]);
+
+  useEffect(() => {
+    api.get("/startups").then((r) => setStartups(r.data)).catch(() => {});
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#FAFAFA]">
-      <Navbar />
+    <div className="min-h-screen bg-[#0A0A0A] text-white selection:bg-[#22D3EE] selection:text-[#0A0A0A]">
+      <DarkNav />
 
       {/* HERO */}
-      <section className="relative grid-paper border-b border-[#1A1A1A]">
-        <div className="max-w-[1400px] mx-auto px-6 pt-20 pb-24 grid grid-cols-1 lg:grid-cols-12 gap-10 items-end">
-          <div className="lg:col-span-8">
-            <div className="overline mb-6">
-              <span className="bg-[#FF3B30] text-white px-2 py-1 mr-2">SPEC 01</span>
-              REAL EXPERIENCE FOR ENGINEERING STUDENTS
-            </div>
-            <h1 className="font-heading text-5xl sm:text-7xl lg:text-[112px] font-black tracking-tighter uppercase leading-[0.92]">
-              Join a virtual<br/>startup. Ship real<br/>
-              <span className="inline-block bg-[#0A0A0A] text-white px-3">code.</span>
-            </h1>
-            <p className="mt-8 max-w-2xl text-base leading-relaxed text-[#0A0A0A]">
-              LaunchPad is a workshop where engineering students plug into virtual startups,
-              claim tasks from real product backlogs, ship pull requests, and walk away with a
-              <span className="font-bold"> verified experience certificate </span>
-              employers can actually trust.
-            </p>
-            <div className="mt-10 flex flex-wrap gap-3">
-              <Link to="/register" data-testid="hero-cta-register" className="btn-primary inline-flex items-center gap-2">
-                Sign up as a student <ArrowRight size={16} />
-              </Link>
-              <Link to="/login" data-testid="hero-cta-login" className="btn-ghost">I already have an account</Link>
-            </div>
+      <section className="relative overflow-hidden">
+        {/* subtle grid backdrop */}
+        <div
+          className="absolute inset-0 opacity-[0.08] pointer-events-none"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.6) 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+            maskImage: "radial-gradient(ellipse at center, black 30%, transparent 75%)",
+          }}
+        />
+        <div className="relative max-w-[1400px] mx-auto px-6 pt-24 pb-32 text-center">
+          {/* Terminal pill */}
+          <div className="inline-flex items-center gap-2 border border-white/15 bg-white/[0.03] rounded-full px-4 py-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22D3EE] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#22D3EE]"></span>
+            </span>
+            <span className="font-mono text-xs text-white/70">
+              <span className="text-white/40">v0.4.0</span> · onboarding 240 students this cohort
+            </span>
           </div>
 
-          <div className="lg:col-span-4 border border-[#1A1A1A] bg-white">
-            <div className="grid grid-cols-2">
-              {[
-                { k: "STARTUPS", v: "05" },
-                { k: "OPEN TASKS", v: "13" },
-                { k: "SKILLS", v: "24+" },
-                { k: "CERT. ISSUED", v: "∞" },
-              ].map((s, i) => (
-                <div key={s.k} className={`p-6 ${i % 2 === 0 ? "border-r" : ""} ${i < 2 ? "border-b" : ""} border-[#1A1A1A]`}>
-                  <div className="overline text-[#525252]">{s.k}</div>
-                  <div className="font-heading text-4xl font-black mt-1">{s.v}</div>
-                </div>
-              ))}
+          <h1 className="font-heading text-6xl sm:text-7xl md:text-8xl lg:text-[128px] font-bold tracking-tight leading-[0.95] mt-8 max-w-6xl mx-auto">
+            Internship-grade work,
+            <br />
+            <span
+              className="bg-clip-text text-transparent"
+              style={{
+                backgroundImage:
+                  "linear-gradient(90deg, #22D3EE 0%, #67E8F9 40%, #F0F9FF 100%)",
+              }}
+            >
+              without the internship.
+            </span>
+          </h1>
+
+          <p className="mt-10 max-w-2xl mx-auto text-base sm:text-lg text-white/60 leading-relaxed font-mono">
+            Join a virtual startup. Pick up real tickets. Ship pull requests. Walk away with a profile of merged PRs and founder-approved experience that a recruiter can verify in one click.
+          </p>
+
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
+            <Link
+              to="/register"
+              data-testid="hero-cta-register"
+              className="group inline-flex items-center gap-2 bg-white text-[#0A0A0A] font-mono text-sm font-semibold px-6 py-3.5 rounded-full hover:bg-[#22D3EE] transition-colors"
+            >
+              Create student profile
+              <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+            </Link>
+            <Link
+              to="/startups"
+              data-testid="hero-cta-browse"
+              className="font-mono text-sm text-white/80 hover:text-white transition-colors px-3"
+            >
+              Browse startups →
+            </Link>
+          </div>
+        </div>
+
+        {/* Terminal decoration bottom-left */}
+        <div className="max-w-[1400px] mx-auto px-6 pb-16">
+          <div className="max-w-md border border-white/10 bg-black/40 shadow-2xl">
+            <div className="flex items-center gap-1.5 px-4 py-2 border-b border-white/10">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#FF605C]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#FFBD44]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#00CA4E]" />
+              <span className="ml-3 font-mono text-[11px] text-white/40">~/launchpad/profile.json</span>
             </div>
-            <div className="border-t border-[#1A1A1A] p-5 flex items-center gap-3">
-              <span className="stamp">Verified</span>
-              <span className="font-mono text-xs leading-snug">Every approved task adds to your verifiable engineering profile.</span>
-            </div>
+            <pre className="p-4 font-mono text-[12px] text-white/70 leading-relaxed">
+{`{
+  "student": "alex.rivera",
+  "startups": ["helix", "forge-ai"],
+  "prs_merged": 7,
+  "skills_verified": ["React", "ROS2", "PyTorch"],
+  "cert": "LP-2026-A4F9" ✓
+}`}
+            </pre>
           </div>
         </div>
       </section>
 
       {/* HOW IT WORKS */}
-      <section className="border-b border-[#1A1A1A] bg-white">
-        <div className="max-w-[1400px] mx-auto px-6 py-20">
-          <div className="overline mb-3">PROTOCOL // 0X02</div>
-          <h2 className="font-heading text-4xl sm:text-5xl font-black tracking-tight">How LaunchPad works.</h2>
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-4 border border-[#1A1A1A]">
+      <section className="border-t border-white/10">
+        <div className="max-w-[1400px] mx-auto px-6 py-24">
+          <h2 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight max-w-3xl">
+            From signup to verified PR in a week.
+          </h2>
+
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { n: "01", t: "Sign up as a student", d: "Tell us your university, major, and year. No paywall.", I: GraduationCap },
-              { n: "02", t: "Join a virtual startup", d: "Browse 5+ live startups with real tech stacks and backlogs.", I: Rocket },
-              { n: "03", t: "Claim & ship a task", d: "Pick a task from the Kanban board. Submit a GitHub PR.", I: Code },
-              { n: "04", t: "Get verified credit", d: "Approved tasks compound into a downloadable certificate.", I: ShieldCheck },
-            ].map((s, i) => (
-              <div key={s.n} className={`p-8 ${i < 3 ? "border-r" : ""} border-[#1A1A1A]`}>
-                <s.I size={32} strokeWidth={1.4} />
-                <div className="overline mt-6 text-[#525252]">STEP // {s.n}</div>
-                <div className="font-heading text-2xl font-bold mt-2">{s.t}</div>
-                <p className="text-sm text-[#525252] mt-3 leading-relaxed">{s.d}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* MARQUEE */}
-      <section className="border-b border-[#1A1A1A] bg-[#0A0A0A] text-white overflow-hidden">
-        <div className="py-4 whitespace-nowrap">
-          <div className="marquee-track inline-flex gap-10 font-heading font-black text-2xl tracking-tight uppercase">
-            {Array.from({ length: 2 }).map((_, k) => (
-              <span key={k} className="inline-flex gap-10">
-                <span>Helix Robotics</span><span className="text-[#FF3B30]">/</span>
-                <span>Stratos Climate</span><span className="text-[#FF3B30]">/</span>
-                <span>Citadel Health</span><span className="text-[#FF3B30]">/</span>
-                <span>Forge AI</span><span className="text-[#FF3B30]">/</span>
-                <span>Beacon Mobility</span><span className="text-[#FF3B30]">/</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* BENTO FEATURES */}
-      <section className="border-b border-[#1A1A1A]">
-        <div className="max-w-[1400px] mx-auto px-6 py-20">
-          <div className="overline mb-3">FEATURES // 0X03</div>
-          <h2 className="font-heading text-4xl sm:text-5xl font-black tracking-tight">Built like a real engineering workflow.</h2>
-
-          <div className="mt-12 grid grid-cols-12 gap-0 border border-[#1A1A1A]">
-            <div className="col-span-12 md:col-span-7 p-10 border-b md:border-b-0 md:border-r border-[#1A1A1A] bg-white">
-              <div className="overline text-[#525252]">CONTROL ROOM</div>
-              <h3 className="font-heading text-3xl font-bold mt-2">Kanban-style task boards</h3>
-              <p className="text-sm text-[#525252] mt-3 max-w-md">Open → In progress → In review → Completed. Every task has a difficulty, skill tags, and points.</p>
-              <div className="mt-8 grid grid-cols-4 border border-[#1A1A1A]">
-                {["OPEN", "PROGRESS", "REVIEW", "DONE"].map((s, i) => (
-                  <div key={s} className={`p-3 ${i < 3 ? "border-r" : ""} border-[#1A1A1A]`}>
-                    <div className="overline text-[#525252]">{s}</div>
-                    <div className="mt-3 h-3 bg-[#0A0A0A]" style={{ width: `${[80, 55, 30, 60][i]}%` }} />
-                    <div className="mt-2 h-3 bg-[#FF3B30]" style={{ width: `${[55, 70, 20, 45][i]}%` }} />
+              { n: "01", t: "Sign up", d: "Tell us your university, stack, and what you want to learn — free for students.", I: Terminal },
+              { n: "02", t: "Join a startup", d: "Browse virtual startups by stage, stack, and open roles. Apply in one click.", I: Rocket },
+              { n: "03", t: "Ship tasks", d: "Pull a ticket from the board, push a PR, link it to the task.", I: GitBranch },
+              { n: "04", t: "Get verified", d: "Mentor approves the task or the PR auto-merges. Either way, it lands on your profile.", I: ShieldCheck },
+            ].map((s) => (
+              <div key={s.n} className="group relative">
+                <div className="border border-white/10 hover:border-white/25 bg-white/[0.02] hover:bg-white/[0.04] p-6 h-full transition-colors">
+                  <s.I size={22} strokeWidth={1.4} className="text-[#22D3EE]" />
+                  <div className="mt-8 font-mono text-sm text-white/50">
+                    {s.n} <span className="text-white/30">·</span> <span className="text-white">{s.t}</span>
                   </div>
-                ))}
-              </div>
-            </div>
-            <div className="col-span-12 md:col-span-5 p-10 bg-[#FAFAFA]">
-              <div className="overline text-[#525252]">SUBMISSION</div>
-              <h3 className="font-heading text-3xl font-bold mt-2">GitHub PR-first</h3>
-              <p className="text-sm text-[#525252] mt-3">Paste your pull request URL. Add notes. Mentor bot reviews and marks it verified.</p>
-              <div className="mt-6 border border-[#1A1A1A] bg-white">
-                <div className="px-4 py-3 border-b border-[#1A1A1A] flex items-center gap-2">
-                  <GitBranch size={16} /><span className="font-mono text-xs">github.com/launchpad/helix/pull/42</span>
-                </div>
-                <div className="px-4 py-3 flex items-center justify-between">
-                  <span className="overline text-[#525252]">STATUS</span>
-                  <span className="tag tag-red">APPROVED</span>
+                  <p className="mt-3 text-sm text-white/60 leading-relaxed font-mono">{s.d}</p>
                 </div>
               </div>
-            </div>
-
-            <div className="col-span-12 md:col-span-5 p-10 border-t border-[#1A1A1A] md:border-r bg-[#FAFAFA]">
-              <div className="overline text-[#525252]">VERIFIED PROFILE</div>
-              <h3 className="font-heading text-3xl font-bold mt-2">Downloadable PDF certificate</h3>
-              <p className="text-sm text-[#525252] mt-3">A clean, printable record of every approved task, ready for recruiters.</p>
-              <div className="mt-6 border border-[#1A1A1A] bg-white p-4">
-                <div className="flex items-center justify-between">
-                  <span className="overline">LAUNCHPAD // CERT</span>
-                  <span className="stamp text-xs">VERIFIED</span>
-                </div>
-                <div className="font-heading text-xl font-black mt-3">ALEX RAMIREZ</div>
-                <div className="overline text-[#525252]">MIT / CS / SR.</div>
-                <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                  <div className="border border-[#1A1A1A] p-2"><div className="overline text-[10px]">XP</div><div className="font-heading font-black text-2xl">240</div></div>
-                  <div className="border border-[#1A1A1A] p-2"><div className="overline text-[10px]">TASKS</div><div className="font-heading font-black text-2xl">07</div></div>
-                  <div className="border border-[#1A1A1A] p-2"><div className="overline text-[10px]">SKILLS</div><div className="font-heading font-black text-2xl">12</div></div>
-                </div>
-              </div>
-            </div>
-            <div className="col-span-12 md:col-span-7 p-10 border-t border-[#1A1A1A] bg-white">
-              <div className="overline text-[#525252]">WHY STUDENTS JOIN</div>
-              <h3 className="font-heading text-3xl font-bold mt-2">Resume gap, solved.</h3>
-              <ul className="mt-6 space-y-3">
-                {[
-                  "Real product backlogs from 5+ virtual startups",
-                  "Skills + points compound as you ship",
-                  "Verifiable certificate recruiters can audit",
-                  "Pick tasks by difficulty: easy / medium / hard",
-                ].map((t) => (
-                  <li key={t} className="flex items-start gap-3">
-                    <CheckCircle size={18} className="mt-0.5" />
-                    <span className="text-sm">{t}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link to="/register" data-testid="features-cta" className="btn-primary inline-flex items-center gap-2 mt-8">
-                Start building <ArrowRight size={16} />
-              </Link>
-            </div>
+            ))}
           </div>
+        </div>
+      </section>
+
+      {/* HIRING NOW */}
+      <section className="border-t border-white/10">
+        <div className="max-w-[1400px] mx-auto px-6 py-24">
+          <div className="flex items-end justify-between gap-6 flex-wrap">
+            <div>
+              <div className="font-mono text-sm text-[#22D3EE] mb-3">// HIRING NOW</div>
+              <h2 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight max-w-3xl">
+                Startups looking for student engineers
+              </h2>
+            </div>
+            <Link
+              to="/startups"
+              data-testid="hiring-view-all"
+              className="font-mono text-sm text-white/80 hover:text-white transition-colors"
+            >
+              View all →
+            </Link>
+          </div>
+
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {(startups.length ? startups : Array(3).fill(null)).slice(0, 6).map((s, i) => {
+              if (!s) {
+                return (
+                  <div key={i} className="border border-white/10 bg-white/[0.02] h-56 animate-pulse" />
+                );
+              }
+              const stageColor = STAGE_COLORS[s.stage] || "#A3E635";
+              const openTasks = s.tasks_count || 0;
+              return (
+                <Link
+                  key={s.id}
+                  to="/register"
+                  data-testid={`hiring-card-${s.id}`}
+                  className="group relative border border-white/10 hover:border-white/30 bg-white/[0.02] hover:bg-white/[0.04] p-6 transition-colors block"
+                >
+                  {/* Top color bar */}
+                  <div className="absolute top-0 left-0 right-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${stageColor}, transparent)` }} />
+
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-heading text-2xl font-bold tracking-tight">{s.name}</div>
+                      <p className="mt-2 text-sm text-white/60 line-clamp-2">{s.tagline}</p>
+                    </div>
+                    <span
+                      className="font-mono text-[10px] uppercase tracking-widest px-2 py-1 border rounded-full whitespace-nowrap"
+                      style={{ color: stageColor, borderColor: `${stageColor}55` }}
+                    >
+                      {s.stage}
+                    </span>
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-1.5">
+                    {(s.tech_stack || []).slice(0, 4).map((t) => (
+                      <span key={t} className="font-mono text-[11px] text-white/70 bg-white/5 border border-white/10 px-2 py-0.5">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="mt-8 pt-4 border-t border-white/10 flex items-center justify-between">
+                    <span className="font-mono text-sm text-white/60">
+                      {openTasks} open task{openTasks === 1 ? "" : "s"}
+                    </span>
+                    <span className="font-mono text-sm text-white/40 group-hover:text-[#22D3EE] transition-colors">
+                      Apply →
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* CLOSING CTA */}
+      <section className="border-t border-white/10 relative overflow-hidden">
+        {/* subtle radial glow */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 50%, rgba(34,211,238,0.10) 0%, transparent 60%)",
+          }}
+        />
+        <div className="relative max-w-[1400px] mx-auto px-6 py-28 text-center">
+          <Sparkles className="mx-auto text-[#22D3EE]" size={28} strokeWidth={1.4} />
+          <h2 className="mt-6 font-heading text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight max-w-4xl mx-auto leading-tight">
+            Your next commit is your<br className="hidden sm:block" /> next line on the résumé.
+          </h2>
+          <p className="mt-6 max-w-xl mx-auto font-mono text-sm text-white/60">
+            Stop building todo apps for class. Ship code people will actually use.
+          </p>
+          <Link
+            to="/register"
+            data-testid="closing-cta-register"
+            className="mt-10 inline-flex items-center gap-2 bg-white text-[#0A0A0A] font-mono text-sm font-semibold px-6 py-3.5 rounded-full hover:bg-[#22D3EE] transition-colors"
+          >
+            Get started · it's free for students
+            <ArrowRight size={16} />
+          </Link>
         </div>
       </section>
 
       {/* FOOTER */}
-      <footer className="bg-[#0A0A0A] text-white">
-        <div className="max-w-[1400px] mx-auto px-6 py-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <div className="font-heading text-2xl font-black tracking-tighter">LAUNCHPAD</div>
-            <div className="overline text-[#A3A3A3]">© {new Date().getFullYear()} ENGINEERED FOR ENGINEERS.</div>
-          </div>
-          <div className="flex gap-3">
-            <Link to="/register" className="btn-primary">Get started</Link>
-          </div>
+      <footer className="border-t border-white/10">
+        <div className="max-w-[1400px] mx-auto px-6 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="font-mono text-xs text-white/40">© 2026 buildX · for engineering students</div>
+          <div className="font-mono text-xs text-white/40">built for engineers, by engineers.</div>
         </div>
       </footer>
     </div>

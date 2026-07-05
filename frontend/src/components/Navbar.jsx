@@ -23,12 +23,12 @@ export default function Navbar() {
     <nav className="border-b border-[#1A1A1A] bg-white sticky top-0 z-40">
       <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center justify-between gap-4">
         <Link to={user ? "/dashboard" : "/"} data-testid="nav-logo" className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-[#FF3B30] border border-[#1A1A1A] flex items-center justify-center">
-            <span className="font-heading font-black text-white text-lg">L</span>
+          <div className="w-9 h-9 bg-[#0A0A0A] border border-[#1A1A1A] flex items-center justify-center">
+            <span className="font-heading font-black text-white text-lg">X</span>
           </div>
           <div className="leading-none">
-            <div className="font-heading text-2xl font-black tracking-tighter">LAUNCHPAD</div>
-            <div className="overline text-[#525252]">VIRTUAL // STARTUP // PLATFORM</div>
+            <div className="font-heading text-2xl font-black tracking-tighter">buildX</div>
+            <div className="overline text-[#525252]">VIRTUAL // STARTUP // WORKSHOP</div>
           </div>
         </Link>
 
