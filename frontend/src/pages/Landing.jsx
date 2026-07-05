@@ -14,12 +14,12 @@ function DarkNav() {
   return (
     <nav className="sticky top-0 z-40 bg-[#0A0A0A]/80 backdrop-blur-md border-b border-white/10">
       <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center justify-between">
-        <Link to="/" data-testid="nav-logo" className="flex items-center gap-3">
-          <div className="w-8 h-8 border border-white/25 flex items-center justify-center">
-            <span className="font-heading font-black text-white text-sm">X</span>
+        <Link to="/" data-testid="nav-logo" className="flex items-center gap-2.5 group">
+          <div className="relative w-8 h-8 bg-[#22D3EE] flex items-center justify-center transition-transform group-hover:rotate-12">
+            <span className="font-heading font-black text-[#0A0A0A] text-lg leading-none">×</span>
           </div>
-          <div className="font-mono text-sm text-white/90">
-            <span className="text-white/50">build</span>X<span className="text-white/50">/students</span>
+          <div className="font-heading text-xl font-bold tracking-tight text-white">
+            build<span className="text-[#22D3EE]">X</span>
           </div>
         </Link>
         <div className="flex items-center gap-6">
@@ -268,7 +268,7 @@ export default function Landing() {
       <footer className="border-t border-white/10">
         <div className="max-w-[1400px] mx-auto px-6 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="font-mono text-xs text-white/40">© 2026 buildX · for engineering students</div>
-          <div className="font-mono text-xs text-white/40">built for engineers, by engineers.</div>
+          <div className="font-mono text-xs text-white/40">ship code · earn verified experience.</div>
         </div>
       </footer>
     </div>
