@@ -145,7 +145,7 @@ export default function Landing() {
         <div className="max-w-[1400px] mx-auto px-6 py-24">
           <div className="flex items-end justify-between gap-6 flex-wrap">
             <div>
-              <div className="font-mono text-sm text-[#22D3EE] mb-3">// HIRING NOW</div>
+              <div className="font-mono text-sm text-[#22D3EE] mb-3">HIRING NOW</div>
               <h2 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight max-w-3xl">
                 Startups looking for student engineers
               </h2>
@@ -246,7 +246,7 @@ export default function Landing() {
       {/* FOOTER */}
       <footer className="border-t border-white/10">
         <div className="max-w-[1400px] mx-auto px-6 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="font-mono text-xs text-white/40">© 2026 buildX · for engineering students</div>
+          <div className="font-mono text-xs text-white/40">© 2026 buildX</div>
           <div className="font-mono text-xs text-white/40">ship code · earn verified experience.</div>
         </div>
       </footer>
