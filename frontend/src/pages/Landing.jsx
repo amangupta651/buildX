@@ -89,7 +89,7 @@ export default function Landing() {
           </h1>
 
           <p className="mt-10 max-w-2xl mx-auto text-base sm:text-lg text-white/60 leading-relaxed font-mono">
-            Join a virtual startup. Pick up real tickets. Ship pull requests. Walk away with a profile of merged PRs and founder-approved experience that a recruiter can verify in one click.
+            The place where students become industry-ready by building real products together.
           </p>
 
           <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
