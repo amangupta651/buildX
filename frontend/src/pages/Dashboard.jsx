@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [startups, setStartups] = useState([]);
 
   useEffect(() => {
+    if (user && user.role === "admin") return;
     (async () => {
       try {
         const [p, s] = await Promise.all([api.get("/profile/me"), api.get("/startups")]);
@@ -23,6 +24,9 @@ export default function Dashboard() {
   const stats = profile?.stats || { tasks_completed: 0, submissions_total: 0, experience_points: 0, skills_earned: [] };
   const joinedIds = new Set((profile?.startups || []).map((s) => s.id));
   const recommended = startups.filter((s) => !joinedIds.has(s.id)).slice(0, 3);
+
+  // Admins get bounced to /admin
+  if (user && user.role === "admin") return <Navigate to="/admin" replace />;
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white">

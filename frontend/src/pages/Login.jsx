@@ -19,8 +19,11 @@ export default function Login() {
     setBusy(false);
     if (ok) {
       toast.success("Welcome back.");
-      const to = loc.state?.from || "/dashboard";
-      nav(to);
+      // Admins go straight to admin dashboard
+      // (login() sets user via response; we read the freshly returned user via context on next tick)
+      const to = loc.state?.from || null;
+      // If a specific redirect was requested, honour it; otherwise let App-level logic route by role
+      nav(to || "/dashboard");
     } else {
       toast.error("Login failed.");
     }

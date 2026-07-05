@@ -36,22 +36,26 @@ export default function Navbar() {
         <div className="flex items-center gap-1">
           {user ? (
             <>
-              {tab("/dashboard", "Dashboard", "nav-dashboard")}
+              {user.role === "admin"
+                ? tab("/admin", "Admin", "nav-admin")
+                : tab("/dashboard", "Dashboard", "nav-dashboard")}
               {tab("/startups", "Startups", "nav-startups")}
-              {tab("/profile", "Profile", "nav-profile")}
+              {user.role !== "admin" && tab("/profile", "Profile", "nav-profile")}
               {tab("/pricing", "Pricing", "nav-pricing")}
               <div className="hidden md:flex items-center gap-3 ml-4 pl-4 border-l border-white/10">
                 <span
                   data-testid="nav-plan-badge"
                   className={`font-mono text-[10px] uppercase tracking-widest px-2 py-1 border ${
-                    user.plan === "pro"
-                      ? "text-[#22D3EE] border-[#22D3EE]/40 bg-[#22D3EE]/10"
-                      : user.plan === "industry"
-                        ? "text-[#FBBF24] border-[#FBBF24]/40 bg-[#FBBF24]/10"
-                        : "text-white/60 border-white/15"
+                    user.role === "admin"
+                      ? "text-[#F472B6] border-[#F472B6]/40 bg-[#F472B6]/10"
+                      : user.plan === "pro"
+                        ? "text-[#22D3EE] border-[#22D3EE]/40 bg-[#22D3EE]/10"
+                        : user.plan === "industry"
+                          ? "text-[#FBBF24] border-[#FBBF24]/40 bg-[#FBBF24]/10"
+                          : "text-white/60 border-white/15"
                   }`}
                 >
-                  {user.plan === "pro" ? "PRO" : user.plan === "industry" ? "IEP" : "FREE"}
+                  {user.role === "admin" ? "ADMIN" : user.plan === "pro" ? "PRO" : user.plan === "industry" ? "IEP" : "FREE"}
                 </span>
                 <div className="flex flex-col items-end leading-tight">
                   <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">signed in</span>

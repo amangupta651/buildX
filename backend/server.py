@@ -311,6 +311,92 @@ async def list_plans():
     return list(PLANS.values())
 
 
+# -----------------------------------------------------------------------------
+# Admin dashboard
+# -----------------------------------------------------------------------------
+async def require_admin(user=Depends(get_current_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+    return user
+
+
+@api.get("/admin/overview")
+async def admin_overview(user=Depends(require_admin)):
+    # Counts
+    total_users = await db.users.count_documents({"role": "student"})
+    total_pro = await db.users.count_documents({"plan": "pro"})
+    total_industry = await db.users.count_documents({"plan": "industry"})
+    total_applications = await db.applications.count_documents({"status": "accepted"})
+    total_submissions = await db.submissions.count_documents({})
+    approved_submissions = await db.submissions.count_documents({"status": "approved"})
+    total_startups = await db.startups.count_documents({})
+
+    # Signups over last 7 days (by day)
+    since = now_utc() - timedelta(days=7)
+    signups_cursor = db.users.find({"role": "student", "created_at": {"$gte": since}}).sort("created_at", 1)
+    signups_by_day = {}
+    async for u in signups_cursor:
+        d = u["created_at"].strftime("%Y-%m-%d") if isinstance(u.get("created_at"), datetime) else "-"
+        signups_by_day[d] = signups_by_day.get(d, 0) + 1
+
+    # Recent signups (latest 20)
+    recent_users = []
+    async for u in db.users.find({"role": "student"}).sort("created_at", -1).limit(20):
+        recent_users.append({
+            "id": str(u["_id"]),
+            "name": u.get("name", ""),
+            "email": u.get("email", ""),
+            "university": u.get("university", ""),
+            "github_handle": u.get("github_handle", ""),
+            "roles_wanted": u.get("roles_wanted", []),
+            "stack": u.get("stack", []),
+            "plan": u.get("plan", "free"),
+            "created_at": u.get("created_at").isoformat() if isinstance(u.get("created_at"), datetime) else None,
+        })
+
+    # Recent submissions with student + task + interview score
+    recent_subs = await db.submissions.find({}).sort("submitted_at", -1).limit(20).to_list(20)
+    if recent_subs:
+        uid_ids = list({s["user_id"] for s in recent_subs})
+        tid_ids = list({s["task_id"] for s in recent_subs})
+        users_map = {str(u["_id"]): u async for u in db.users.find({"_id": {"$in": [ObjectId(x) for x in uid_ids]}})}
+        tasks_map = {str(t["_id"]): t async for t in db.tasks.find({"_id": {"$in": [ObjectId(x) for x in tid_ids]}})}
+    else:
+        users_map = {}; tasks_map = {}
+    submissions_out = []
+    for s in recent_subs:
+        u = users_map.get(s["user_id"])
+        t = tasks_map.get(s["task_id"])
+        iv = s.get("interview") or {}
+        submissions_out.append({
+            "id": str(s["_id"]),
+            "user_name": (u or {}).get("name", "?"),
+            "user_email": (u or {}).get("email", ""),
+            "task_title": (t or {}).get("title", ""),
+            "ticket_no": (t or {}).get("ticket_no", ""),
+            "github_url": s.get("github_url", ""),
+            "status": s.get("status", "pending"),
+            "overall": iv.get("overall"),
+            "scores": iv.get("scores"),
+            "submitted_at": s["submitted_at"].isoformat() if isinstance(s.get("submitted_at"), datetime) else s.get("submitted_at"),
+        })
+
+    return {
+        "counts": {
+            "students": total_users,
+            "pro_subscribers": total_pro,
+            "industry_subscribers": total_industry,
+            "startups": total_startups,
+            "startup_applications": total_applications,
+            "submissions_total": total_submissions,
+            "submissions_approved": approved_submissions,
+        },
+        "signups_by_day": [{"date": d, "count": signups_by_day[d]} for d in sorted(signups_by_day.keys())],
+        "recent_users": recent_users,
+        "recent_submissions": submissions_out,
+    }
+
+
 @api.get("/billing/me")
 async def my_billing(user=Depends(get_current_user)):
     plan_id = user_plan(user)
