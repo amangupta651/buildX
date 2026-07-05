@@ -36,7 +36,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <ScrollToTop />
-        <Toaster position="top-right" toastOptions={{ style: { borderRadius: 0, border: "1px solid #1A1A1A", fontFamily: "JetBrains Mono, monospace" } }} />
+        <Toaster position="top-right" toastOptions={{ style: { borderRadius: 0, border: "1px solid rgba(255,255,255,0.15)", background: "#0A0A0A", color: "#fff", fontFamily: "JetBrains Mono, monospace" } }} />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
