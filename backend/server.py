@@ -333,7 +333,7 @@ async def admin_overview(user=Depends(require_admin)):
 
     # Signups over last 7 days (by day)
     since = now_utc() - timedelta(days=7)
-    signups_cursor = db.users.find({"role": "student", "created_at": {"$gte": since}}).sort("created_at", 1)
+    signups_cursor = db.users.find({"role": "student", "created_at": {"$gte": since}}, {"created_at": 1}).sort("created_at", 1)
     signups_by_day = {}
     async for u in signups_cursor:
         d = u["created_at"].strftime("%Y-%m-%d") if isinstance(u.get("created_at"), datetime) else "-"
@@ -341,7 +341,10 @@ async def admin_overview(user=Depends(require_admin)):
 
     # Recent signups (latest 20)
     recent_users = []
-    async for u in db.users.find({"role": "student"}).sort("created_at", -1).limit(20):
+    async for u in db.users.find(
+        {"role": "student"},
+        {"_id": 1, "name": 1, "email": 1, "university": 1, "github_handle": 1, "roles_wanted": 1, "stack": 1, "plan": 1, "created_at": 1},
+    ).sort("created_at", -1).limit(20):
         recent_users.append({
             "id": str(u["_id"]),
             "name": u.get("name", ""),
@@ -359,8 +362,8 @@ async def admin_overview(user=Depends(require_admin)):
     if recent_subs:
         uid_ids = list({s["user_id"] for s in recent_subs})
         tid_ids = list({s["task_id"] for s in recent_subs})
-        users_map = {str(u["_id"]): u async for u in db.users.find({"_id": {"$in": [ObjectId(x) for x in uid_ids]}})}
-        tasks_map = {str(t["_id"]): t async for t in db.tasks.find({"_id": {"$in": [ObjectId(x) for x in tid_ids]}})}
+        users_map = {str(u["_id"]): u async for u in db.users.find({"_id": {"$in": [ObjectId(x) for x in uid_ids]}}, {"_id": 1, "name": 1, "email": 1})}
+        tasks_map = {str(t["_id"]): t async for t in db.tasks.find({"_id": {"$in": [ObjectId(x) for x in tid_ids]}}, {"_id": 1, "title": 1, "ticket_no": 1})}
     else:
         users_map = {}; tasks_map = {}
     submissions_out = []
@@ -973,13 +976,13 @@ async def my_certificate(user=Depends(get_current_user)):
     task_ids = [ObjectId(s["task_id"]) for s in subs]
     startups = []
     if startup_ids:
-        async for s in db.startups.find({"_id": {"$in": startup_ids}}):
+        async for s in db.startups.find({"_id": {"$in": startup_ids}}, {"name": 1}):
             startups.append(s["name"])
     skills_set = set()
     points = 0
     completed_tasks = []
     if task_ids:
-        async for t in db.tasks.find({"_id": {"$in": task_ids}}):
+        async for t in db.tasks.find({"_id": {"$in": task_ids}}, {"title": 1, "skills": 1, "points": 1}):
             completed_tasks.append(t["title"])
             for sk in t.get("skills", []):
                 skills_set.add(sk)
