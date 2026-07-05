@@ -118,7 +118,7 @@ export default function Landing() {
               <span className="w-2.5 h-2.5 rounded-full bg-[#FF605C]" />
               <span className="w-2.5 h-2.5 rounded-full bg-[#FFBD44]" />
               <span className="w-2.5 h-2.5 rounded-full bg-[#00CA4E]" />
-              <span className="ml-3 font-mono text-[11px] text-white/40">~/launchpad/profile.json</span>
+              <span className="ml-3 font-mono text-[11px] text-white/40">~/buildx/profile.json</span>
             </div>
             <pre className="p-4 font-mono text-[12px] text-white/70 leading-relaxed">
 {`{

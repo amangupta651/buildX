@@ -49,7 +49,7 @@ export default function Profile() {
       const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       const a = document.createElement("a");
       a.href = url;
-      a.download = `launchpad-certificate-${(user?.name || "student").replace(/\s+/g, "_").toLowerCase()}.pdf`;
+      a.download = `buildx-certificate-${(user?.name || "student").replace(/\s+/g, "_").toLowerCase()}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -79,7 +79,7 @@ export default function Profile() {
         {/* Certificate-style header */}
         <div className="border border-[#1A1A1A] bg-white">
           <div className="px-6 py-3 border-b border-[#1A1A1A] flex items-center justify-between">
-            <div className="overline">LAUNCHPAD // VERIFIED ENGINEERING PROFILE</div>
+            <div className="overline">BUILDX // VERIFIED ENGINEERING PROFILE</div>
             <div className="overline text-[#525252]">CERT-ID {profile.user.id?.slice(-8).toUpperCase()}</div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-12">

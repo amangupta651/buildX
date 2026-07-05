@@ -34,7 +34,7 @@ db = client[os.environ['DB_NAME']]
 JWT_ALGORITHM = "HS256"
 JWT_SECRET = os.environ["JWT_SECRET"]
 
-app = FastAPI(title="LaunchPad API")
+app = FastAPI(title="buildX API")
 api = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -505,7 +505,7 @@ async def my_certificate(user=Depends(get_current_user)):
 
     # Overline
     c.setFont("Helvetica-Bold", 9)
-    c.drawString(0.9 * inch, height - 1.0 * inch, "LAUNCHPAD // VERIFIED ENGINEERING EXPERIENCE")
+    c.drawString(0.9 * inch, height - 1.0 * inch, "BUILDX // VERIFIED ENGINEERING EXPERIENCE")
     c.drawRightString(width - 0.9 * inch, height - 1.0 * inch, f"ISSUED {now_utc().strftime('%Y.%m.%d')}")
 
     # Title
@@ -557,14 +557,14 @@ async def my_certificate(user=Depends(get_current_user)):
 
     # Footer
     c.setFont("Helvetica-Bold", 8)
-    c.drawString(0.9 * inch, 0.85 * inch, "LAUNCHPAD VIRTUAL STARTUP PLATFORM")
+    c.drawString(0.9 * inch, 0.85 * inch, "BUILDX // VIRTUAL STARTUP WORKSHOP")
     c.setFont("Helvetica", 8)
     c.drawRightString(width - 0.9 * inch, 0.85 * inch, f"CERT-ID: {uid[-12:].upper()}")
 
     c.showPage()
     c.save()
     buf.seek(0)
-    filename = f"launchpad-certificate-{user.get('name', 'student').replace(' ', '_').lower()}.pdf"
+    filename = f"buildx-certificate-{user.get('name', 'student').replace(' ', '_').lower()}.pdf"
     return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
@@ -680,7 +680,7 @@ async def seed_admin():
         await db.users.insert_one({
             "email": email,
             "password_hash": hash_password(password),
-            "name": "LaunchPad Admin",
+            "name": "buildX Admin",
             "university": "",
             "major": "",
             "year": "",
@@ -696,7 +696,7 @@ async def seed_admin():
 # -----------------------------------------------------------------------------
 @api.get("/")
 async def root():
-    return {"name": "LaunchPad API", "status": "ok"}
+    return {"name": "buildX API", "status": "ok"}
 
 
 app.include_router(api)
@@ -719,7 +719,7 @@ async def startup_event():
     await db.submissions.create_index("user_id")
     await seed_admin()
     await seed_data()
-    logger.info("LaunchPad backend ready.")
+    logger.info("buildX backend ready.")
 
 
 @app.on_event("shutdown")
