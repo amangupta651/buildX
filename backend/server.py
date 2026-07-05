@@ -88,6 +88,9 @@ def serialize_user(doc: dict) -> dict:
         "year": doc.get("year", ""),
         "bio": doc.get("bio", ""),
         "skills": doc.get("skills", []),
+        "github_handle": doc.get("github_handle", ""),
+        "roles_wanted": doc.get("roles_wanted", []),
+        "stack": doc.get("stack", []),
         "role": doc.get("role", "student"),
         "plan": doc.get("plan", "free"),
         "plan_expires_at": doc.get("plan_expires_at").isoformat() if isinstance(doc.get("plan_expires_at"), datetime) else doc.get("plan_expires_at"),
@@ -192,6 +195,10 @@ class RegisterIn(BaseModel):
     university: Optional[str] = ""
     major: Optional[str] = ""
     year: Optional[str] = ""
+    github_handle: Optional[str] = ""
+    bio: Optional[str] = ""
+    roles_wanted: Optional[List[str]] = []
+    stack: Optional[List[str]] = []
 
 
 class LoginIn(BaseModel):
@@ -206,6 +213,9 @@ class ProfileUpdate(BaseModel):
     year: Optional[str] = None
     bio: Optional[str] = None
     skills: Optional[List[str]] = None
+    github_handle: Optional[str] = None
+    roles_wanted: Optional[List[str]] = None
+    stack: Optional[List[str]] = None
 
 
 class SubmissionIn(BaseModel):
@@ -234,9 +244,13 @@ async def register(body: RegisterIn, response: Response):
         "university": body.university or "",
         "major": body.major or "",
         "year": body.year or "",
-        "bio": "",
+        "bio": body.bio or "",
         "skills": [],
+        "github_handle": (body.github_handle or "").lstrip("@").strip(),
+        "roles_wanted": body.roles_wanted or [],
+        "stack": body.stack or [],
         "role": "student",
+        "plan": "free",
         "created_at": now_utc(),
     }
     result = await db.users.insert_one(doc)
