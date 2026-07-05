@@ -1,0 +1,46 @@
+{
+  "summary": "Freemium tier iteration: 7/7 backend tests pass (plans, billing/me, free project limit 402, AI mentor 402, pro upgrade + unlimited joins + AI review, industry upgrade ~90d, invalid plan 400). Frontend mostly works (pricing page, landing preview, register/badge, pro upgrade, badge flips to PRO, AI mentor modal shows strengths/improvements for Pro, free user AI mentor click correctly shows upgrade modal). CRITICAL FRONTEND BUG: Free user's 2nd startup join does NOT show UpgradeModal — instead shows a toast reading '[object Object]'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "StartupDetail.jsx -> join() + lib/api.js formatApiErrorDetail",
+        "issue": "When a Free user tries to join a 2nd startup, backend returns 402 with detail={code:'plan_limit_reached', message, current_plan}. The join() handler does not check detail.code and just calls toast.error(formatApiErrorDetail(detail)). formatApiErrorDetail then hits its fallback (String(detail)) and displays '[object Object]'. Expected: setUpgradePrompt({...}) to open UpgradeModal (as spec requires and as AIMentorModal already does for plan_required).",
+        "selector": "[data-testid=\"startup-join-btn\"]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Free user 2nd startup join -> UpgradeModal",
+        "issue": "Never triggers UpgradeModal; instead surfaces '[object Object]' toast.",
+        "affected_selectors": ["[data-testid=\"upgrade-modal-cta\"]", "[data-testid=\"startup-join-btn\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_freemium.py",
+    "/app/test_reports/pytest/freemium_results.xml"
+  ],
+  "action_items": [
+    "Fix StartupDetail.jsx join(): on 402 with detail.code==='plan_limit_reached', call setUpgradePrompt({ message: detail.message, feature: 'Unlimited Startups' }) instead of toast.error.",
+    "Harden lib/api.js formatApiErrorDetail() to return detail.message when detail is an object with a message string (currently only checks detail.msg), so error toasts never render '[object Object]'."
+  ],
+  "critical_code_review_comments": [
+    "formatApiErrorDetail should support the FastAPI HTTPException(detail={code, message, ...}) shape used across this codebase; add: if (detail && typeof detail.message === 'string') return detail.message;",
+    "Payment upgrade is fully mocked — flagged in review request; no real gateway integration. OK per scope.",
+    "AIMentorModal already handles plan_required correctly — StartupDetail.join() should follow the same pattern for plan_limit_reached (DRY: extract a helper).",
+    "server.py user_plan() correctly downgrades to free on expiry."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_freemium.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "~85% (1 critical bug on free-user 2nd-join UpgradeModal)"},
+  "test_credentials": "admin@launchpad.dev / LaunchPad2026! ; fresh students created per-test via /api/auth/register",
+  "seed_data_creation": "None beyond registering TEST_ users. Existing 5 seeded startups used.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend freemium fully verified via /app/backend/tests/test_freemium.py — rerun with pytest to regress. Frontend outstanding: verify Free user's 2nd startup join renders UpgradeModal (data-testid upgrade-modal-cta) instead of '[object Object]' toast. All other freemium flows (pricing page, landing preview, Pro upgrade + badge refresh, Pro AI mentor modal with strengths/improvements, Free user AI mentor click -> UpgradeModal) already confirmed working.",
+  "rca of the issue": "Root cause of '[object Object]' toast: lib/api.js formatApiErrorDetail only recognizes detail.msg (Pydantic validation shape) but backend returns detail.message (custom shape). Falls through to String(detail) => '[object Object]'. Additionally, StartupDetail.join() should intercept detail.code==='plan_limit_reached' and open the UpgradeModal (already imported and wired for AI mentor flow) instead of toasting the error. Reproduction: register new user -> apply to any startup -> apply to a second startup -> observe '[object Object]' toast and no modal. Mitigation in action_items."
+}

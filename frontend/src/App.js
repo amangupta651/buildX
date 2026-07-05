@@ -9,6 +9,7 @@ import Dashboard from "@/pages/Dashboard";
 import Startups from "@/pages/Startups";
 import StartupDetail from "@/pages/StartupDetail";
 import Profile from "@/pages/Profile";
+import Pricing from "@/pages/Pricing";
 import "@/App.css";
 
 function ProtectedRoute({ children }) {
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/startups" element={<ProtectedRoute><Startups /></ProtectedRoute>} />
           <Route path="/startups/:id" element={<ProtectedRoute><StartupDetail /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/pricing" element={<Pricing />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

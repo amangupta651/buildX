@@ -24,7 +24,7 @@ function DarkNav() {
         </Link>
         <div className="flex items-center gap-6">
           <Link to="/startups" className="hidden md:inline font-mono text-sm text-white/70 hover:text-white transition-colors">Startups</Link>
-          <Link to="/login" className="hidden md:inline font-mono text-sm text-white/70 hover:text-white transition-colors">Profile</Link>
+          <Link to="/pricing" className="hidden md:inline font-mono text-sm text-white/70 hover:text-white transition-colors">Pricing</Link>
           <Link to="/login" data-testid="nav-login" className="font-mono text-sm text-white/80 hover:text-white transition-colors">Sign in</Link>
           <Link
             to="/register"
@@ -231,6 +231,55 @@ export default function Landing() {
                 </Link>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      {/* PRICING PREVIEW */}
+      <section className="border-t border-white/10">
+        <div className="max-w-[1400px] mx-auto px-6 py-24">
+          <div className="flex items-end justify-between gap-6 flex-wrap">
+            <div>
+              <div className="font-mono text-sm text-[#22D3EE] mb-3">// pricing</div>
+              <h2 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight max-w-3xl">
+                Start free. Upgrade when you're hungry.
+              </h2>
+            </div>
+            <Link
+              to="/pricing"
+              data-testid="landing-pricing-cta"
+              className="font-mono text-sm text-white/80 hover:text-white transition-colors"
+            >
+              See all plans →
+            </Link>
+          </div>
+
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { id: "free", name: "Free", price: "₹0", tag: "1 project · community mentor", cta: "Start free", to: "/register", accent: "#94A3B8" },
+              { id: "pro", name: "Pro", price: "₹299", cadence: "/ month", tag: "Unlimited startups · AI Mentor", cta: "Go Pro →", to: "/pricing", accent: "#22D3EE", featured: true },
+              { id: "industry", name: "Industry Experience", price: "₹1499", cadence: "/ one-time", tag: "3-month founder-graded program", cta: "Join program →", to: "/pricing", accent: "#FBBF24" },
+            ].map((p) => (
+              <Link
+                key={p.id}
+                to={p.to}
+                data-testid={`landing-plan-${p.id}`}
+                className={`relative border p-6 transition-colors ${p.featured ? "border-white/40 bg-white/[0.04] hover:border-white/60" : "border-white/10 bg-white/[0.02] hover:border-white/25"}`}
+              >
+                {p.featured && (
+                  <div className="absolute -top-3 left-6 font-mono text-[10px] uppercase tracking-widest px-2 py-1 bg-[#22D3EE] text-[#0A0A0A]">
+                    most popular
+                  </div>
+                )}
+                <div className="font-heading text-xl font-bold" style={{ color: p.accent }}>{p.name}</div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="font-heading text-4xl font-bold text-white">{p.price}</span>
+                  {p.cadence && <span className="font-mono text-xs text-white/50">{p.cadence}</span>}
+                </div>
+                <div className="mt-3 font-mono text-sm text-white/60">{p.tag}</div>
+                <div className="mt-6 font-mono text-sm text-white/80">{p.cta}</div>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

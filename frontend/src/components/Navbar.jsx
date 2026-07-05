@@ -39,7 +39,20 @@ export default function Navbar() {
               {tab("/dashboard", "Dashboard", "nav-dashboard")}
               {tab("/startups", "Startups", "nav-startups")}
               {tab("/profile", "Profile", "nav-profile")}
+              {tab("/pricing", "Pricing", "nav-pricing")}
               <div className="hidden md:flex items-center gap-3 ml-4 pl-4 border-l border-white/10">
+                <span
+                  data-testid="nav-plan-badge"
+                  className={`font-mono text-[10px] uppercase tracking-widest px-2 py-1 border ${
+                    user.plan === "pro"
+                      ? "text-[#22D3EE] border-[#22D3EE]/40 bg-[#22D3EE]/10"
+                      : user.plan === "industry"
+                        ? "text-[#FBBF24] border-[#FBBF24]/40 bg-[#FBBF24]/10"
+                        : "text-white/60 border-white/15"
+                  }`}
+                >
+                  {user.plan === "pro" ? "PRO" : user.plan === "industry" ? "IEP" : "FREE"}
+                </span>
                 <div className="flex flex-col items-end leading-tight">
                   <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">signed in</span>
                   <span className="font-mono text-xs text-white">{user.name || user.email}</span>
@@ -55,6 +68,7 @@ export default function Navbar() {
             </>
           ) : (
             <>
+              <Link to="/pricing" data-testid="nav-pricing-guest" className="hidden md:inline font-mono text-sm text-white/70 hover:text-white transition-colors px-3">Pricing</Link>
               <Link to="/login" data-testid="nav-login" className="font-mono text-sm text-white/80 hover:text-white transition-colors px-3">Sign in</Link>
               <Link
                 to="/register"

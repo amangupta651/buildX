@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
+import UpgradeModal from "@/components/UpgradeModal";
 import { api, formatApiErrorDetail } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import { X, GitPullRequest, CheckCircle2, Sparkles, Zap } from "lucide-react";
+import { X, GitPullRequest, CheckCircle2, Sparkles, Zap, Bot } from "lucide-react";
 
 const COLUMNS = [
   { key: "open", label: "Open", accent: "#22D3EE" },
@@ -33,6 +34,8 @@ export default function StartupDetail() {
   const [tasks, setTasks] = useState([]);
   const [joined, setJoined] = useState(false);
   const [submitTask, setSubmitTask] = useState(null);
+  const [aiTask, setAiTask] = useState(null);
+  const [upgradePrompt, setUpgradePrompt] = useState(null);
 
   const loadAll = useCallback(async () => {
     const [s, t, m] = await Promise.all([
@@ -199,13 +202,22 @@ export default function StartupDetail() {
                           </button>
                         )}
                         {col.key === "in_progress" && isAssignee(t) && (
-                          <button
-                            data-testid={`task-submit-${t.id}`}
-                            onClick={() => setSubmitTask(t)}
-                            className="w-full font-mono text-xs font-semibold py-2 bg-[#22D3EE] text-[#0A0A0A] hover:bg-white transition-colors inline-flex items-center justify-center gap-2"
-                          >
-                            <GitPullRequest size={12}/> Submit PR
-                          </button>
+                          <div className="space-y-2">
+                            <button
+                              data-testid={`task-submit-${t.id}`}
+                              onClick={() => setSubmitTask(t)}
+                              className="w-full font-mono text-xs font-semibold py-2 bg-[#22D3EE] text-[#0A0A0A] hover:bg-white transition-colors inline-flex items-center justify-center gap-2"
+                            >
+                              <GitPullRequest size={12}/> Submit PR
+                            </button>
+                            <button
+                              data-testid={`task-ai-mentor-${t.id}`}
+                              onClick={() => setAiTask(t)}
+                              className="w-full font-mono text-xs py-2 border border-white/15 text-white/80 hover:border-[#F472B6]/60 hover:text-[#F472B6] transition-colors inline-flex items-center justify-center gap-2"
+                            >
+                              <Bot size={12}/> Ask AI Mentor
+                            </button>
+                          </div>
                         )}
                         {col.key === "in_review" && (
                           <div className="font-mono text-[10px] uppercase tracking-widest text-center text-[#F472B6] py-1">// under review</div>
@@ -232,6 +244,19 @@ export default function StartupDetail() {
           onSubmitted={() => { setSubmitTask(null); loadAll(); }}
         />
       )}
+      {aiTask && (
+        <AIMentorModal
+          task={aiTask}
+          onClose={() => setAiTask(null)}
+          onUpgradeNeeded={(msg) => { setAiTask(null); setUpgradePrompt({ message: msg, feature: "AI Mentor" }); }}
+        />
+      )}
+      <UpgradeModal
+        open={!!upgradePrompt}
+        onClose={() => setUpgradePrompt(null)}
+        message={upgradePrompt?.message}
+        feature={upgradePrompt?.feature}
+      />
     </div>
   );
 }
@@ -320,3 +345,106 @@ function SubmissionModal({ task, onClose, onSubmitted }) {
     </div>
   );
 }
+
+function AIMentorModal({ task, onClose, onUpgradeNeeded }) {
+  const [loading, setLoading] = useState(true);
+  const [review, setReview] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.post("/ai-mentor/review", { task_id: task.id });
+        setReview(data);
+      } catch (e) {
+        const detail = e.response?.data?.detail;
+        if (detail && typeof detail === "object" && detail.code === "plan_required") {
+          onUpgradeNeeded(detail.message);
+        } else {
+          toast.error(formatApiErrorDetail(detail));
+          onClose();
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.id]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center p-4">
+      <div className="w-full max-w-2xl bg-[#0A0A0A] border border-white/15 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 sticky top-0 bg-[#0A0A0A]">
+          <div className="flex items-center gap-2">
+            <Bot size={18} className="text-[#F472B6]" />
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-widest text-[#F472B6]">// ai mentor</div>
+              <div className="font-heading text-lg font-bold mt-0.5 text-white">{task.title}</div>
+            </div>
+          </div>
+          <button
+            data-testid="ai-mentor-close"
+            onClick={onClose}
+            className="text-white/60 hover:text-white border border-white/15 hover:border-white/40 p-2 transition-colors"
+          >
+            <X size={16}/>
+          </button>
+        </div>
+
+        <div className="p-6">
+          {loading && (
+            <div className="font-mono text-sm text-white/60 py-8 text-center">
+              <div className="inline-block animate-pulse">Analyzing your task…</div>
+            </div>
+          )}
+          {review && (
+            <div className="space-y-6">
+              <div className="border border-white/10 bg-white/[0.02] p-5">
+                <div className="flex items-center justify-between">
+                  <div className="font-mono text-[10px] uppercase tracking-widest text-white/40">verdict</div>
+                  <div className="font-mono text-xs">
+                    <span className="text-white/40">score: </span>
+                    <span className="text-[#A3E635] font-bold">{review.score}/100</span>
+                  </div>
+                </div>
+                <div className="font-heading text-xl font-bold mt-2 text-[#22D3EE]">{review.verdict}</div>
+                <p className="font-mono text-sm text-white/70 mt-2">{review.summary}</p>
+              </div>
+
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-[#A3E635] mb-2">// strengths</div>
+                <ul className="space-y-2">
+                  {review.strengths.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 font-mono text-sm text-white/80">
+                      <span className="text-[#A3E635] mt-0.5">+</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-[#FBBF24] mb-2">// improvements</div>
+                <ul className="space-y-2">
+                  {review.improvements.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 font-mono text-sm text-white/80">
+                      <span className="text-[#FBBF24] mt-0.5">→</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="border border-white/10 bg-white/[0.02] p-4 flex items-start gap-3">
+                <Sparkles size={14} className="text-[#22D3EE] mt-0.5"/>
+                <div className="text-xs font-mono text-white/60">
+                  This review is generated by the buildX AI Mentor based on the task spec. When you submit your PR, the mentor bot will run a final verification.
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+

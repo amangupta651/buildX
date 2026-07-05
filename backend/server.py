@@ -89,8 +89,75 @@ def serialize_user(doc: dict) -> dict:
         "bio": doc.get("bio", ""),
         "skills": doc.get("skills", []),
         "role": doc.get("role", "student"),
+        "plan": doc.get("plan", "free"),
+        "plan_expires_at": doc.get("plan_expires_at").isoformat() if isinstance(doc.get("plan_expires_at"), datetime) else doc.get("plan_expires_at"),
         "created_at": doc.get("created_at", now_utc()).isoformat() if isinstance(doc.get("created_at"), datetime) else doc.get("created_at"),
     }
+
+
+# -----------------------------------------------------------------------------
+# Plans
+# -----------------------------------------------------------------------------
+PLANS = {
+    "free": {
+        "id": "free",
+        "name": "Free",
+        "price_inr": 0,
+        "cadence": "forever",
+        "tagline": "Try the platform, ship 1 project.",
+        "project_limit": 1,
+        "ai_mentor": False,
+        "features": [
+            "Join 1 virtual startup",
+            "Access the task board & submit PRs",
+            "Web-only experience profile",
+            "Community mentor review",
+        ],
+    },
+    "pro": {
+        "id": "pro",
+        "name": "Pro",
+        "price_inr": 299,
+        "cadence": "month",
+        "tagline": "Unlimited projects + your own AI mentor.",
+        "project_limit": None,  # unlimited
+        "ai_mentor": True,
+        "features": [
+            "Unlimited virtual startups",
+            "AI Mentor: instant PR & code reviews",
+            "Downloadable PDF certificate",
+            "Priority mentor review queue",
+            "Featured student badge on profile",
+        ],
+    },
+    "industry": {
+        "id": "industry",
+        "name": "Industry Experience Program",
+        "price_inr": 1499,
+        "cadence": "one-time",
+        "tagline": "The full 3-month, founder-graded startup experience.",
+        "project_limit": None,
+        "ai_mentor": True,
+        "features": [
+            "Everything in Pro, for 3 months",
+            "Assigned founder-mentor + weekly 1:1",
+            "Industry-grade project brief with a real startup",
+            "Founder-signed experience letter (verifiable)",
+            "Recruiter-visible portfolio placement",
+        ],
+    },
+}
+
+
+def user_plan(user: dict) -> str:
+    p = user.get("plan", "free")
+    exp = user.get("plan_expires_at")
+    if p != "free" and exp and isinstance(exp, datetime):
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp < now_utc():
+            return "free"
+    return p
 
 
 async def get_current_user(request: Request) -> dict:
@@ -216,8 +283,95 @@ async def update_me(body: ProfileUpdate, user=Depends(get_current_user)):
 
 
 # -----------------------------------------------------------------------------
-# Startups
+# Plans & Billing (MOCKED payment — swap for Razorpay/Stripe later)
 # -----------------------------------------------------------------------------
+class UpgradeIn(BaseModel):
+    plan: str  # "pro" | "industry"
+
+
+@api.get("/plans")
+async def list_plans():
+    return list(PLANS.values())
+
+
+@api.get("/billing/me")
+async def my_billing(user=Depends(get_current_user)):
+    plan_id = user_plan(user)
+    projects_used = await db.applications.count_documents({"user_id": str(user["_id"]), "status": "accepted"})
+    return {
+        "plan": PLANS[plan_id],
+        "plan_expires_at": user.get("plan_expires_at").isoformat() if isinstance(user.get("plan_expires_at"), datetime) else None,
+        "projects_used": projects_used,
+    }
+
+
+@api.post("/billing/upgrade")
+async def upgrade_plan(body: UpgradeIn, user=Depends(get_current_user)):
+    """MOCK checkout — flips the user's plan in DB. Replace with Razorpay/Stripe order flow."""
+    if body.plan not in ("pro", "industry"):
+        raise HTTPException(400, "Invalid plan")
+    if body.plan == "pro":
+        expires = now_utc() + timedelta(days=30)
+    else:  # industry — 3 months
+        expires = now_utc() + timedelta(days=90)
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"plan": body.plan, "plan_expires_at": expires, "upgraded_at": now_utc()}},
+    )
+    updated = await db.users.find_one({"_id": user["_id"]})
+    return {
+        "user": serialize_user(updated),
+        "plan": PLANS[body.plan],
+        "message": f"Welcome to {PLANS[body.plan]['name']}!",
+    }
+
+
+# -----------------------------------------------------------------------------
+# AI Mentor (paid tiers only) — mocked review; swap for LLM call later
+# -----------------------------------------------------------------------------
+class AIMentorIn(BaseModel):
+    task_id: str
+    github_url: Optional[str] = ""
+    notes: Optional[str] = ""
+
+
+@api.post("/ai-mentor/review")
+async def ai_mentor_review(body: AIMentorIn, user=Depends(get_current_user)):
+    plan_id = user_plan(user)
+    if not PLANS[plan_id].get("ai_mentor"):
+        raise HTTPException(
+            402,
+            detail={
+                "code": "plan_required",
+                "message": "AI Mentor is a Pro feature. Upgrade to unlock instant code reviews.",
+                "current_plan": plan_id,
+            },
+        )
+    t = await db.tasks.find_one({"_id": ObjectId(body.task_id)})
+    if not t:
+        raise HTTPException(404, "Task not found")
+
+    # MOCKED response — replace with real LLM call via emergentintegrations
+    skill_list = ", ".join(t.get("skills", [])[:3]) or "engineering fundamentals"
+    review = {
+        "summary": f"Solid attempt at '{t['title']}'. Your approach shows understanding of {skill_list}.",
+        "strengths": [
+            "Clear commit hygiene and PR description",
+            f"Correct use of {t.get('skills', ['the required stack'])[0] if t.get('skills') else 'the required stack'}",
+            "Readable code structure",
+        ],
+        "improvements": [
+            "Add unit tests around the core logic to prevent regressions",
+            "Extract magic numbers into named constants",
+            "Consider edge cases: empty input, network failure, concurrent writes",
+        ],
+        "score": 82,
+        "verdict": "Ready to merge with minor revisions",
+    }
+    return review
+
+
+
 def serialize_startup(doc: dict) -> dict:
     return {
         "id": str(doc["_id"]),
@@ -267,7 +421,22 @@ async def apply_startup(startup_id: str, user=Depends(get_current_user)):
     existing = await db.applications.find_one({"user_id": uid, "startup_id": startup_id})
     if existing:
         return {"status": existing["status"], "message": "Already applied"}
-    # Auto-accept (simple flow)
+
+    # Enforce project limit based on plan
+    plan_id = user_plan(user)
+    limit = PLANS.get(plan_id, PLANS["free"]).get("project_limit")
+    if limit is not None:
+        current = await db.applications.count_documents({"user_id": uid, "status": "accepted"})
+        if current >= limit:
+            raise HTTPException(
+                402,
+                detail={
+                    "code": "plan_limit_reached",
+                    "message": f"Your {PLANS[plan_id]['name']} plan allows {limit} project. Upgrade to Pro for unlimited startups.",
+                    "current_plan": plan_id,
+                },
+            )
+
     doc = {
         "user_id": uid,
         "startup_id": startup_id,
