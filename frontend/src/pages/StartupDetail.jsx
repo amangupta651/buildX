@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import UpgradeModal from "@/components/UpgradeModal";
+import TicketDetailModal from "@/components/TicketDetailModal";
+import SubmitAndInterviewModal from "@/components/SubmitAndInterviewModal";
 import { api, formatApiErrorDetail } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -35,6 +37,7 @@ export default function StartupDetail() {
   const [joined, setJoined] = useState(false);
   const [submitTask, setSubmitTask] = useState(null);
   const [aiTask, setAiTask] = useState(null);
+  const [ticketOpen, setTicketOpen] = useState(null);
   const [upgradePrompt, setUpgradePrompt] = useState(null);
 
   const loadAll = useCallback(async () => {
@@ -162,31 +165,43 @@ export default function StartupDetail() {
                 {col.items.map((t) => {
                   const diff = DIFF_META[t.difficulty] || DIFF_META.medium;
                   return (
-                    <div key={t.id} data-testid={`task-card-${t.id}`} className="border border-white/10 hover:border-white/25 bg-white/[0.02] hover:bg-white/[0.04] p-4 transition-colors">
+                    <div
+                      key={t.id}
+                      data-testid={`task-card-${t.id}`}
+                      onClick={() => setTicketOpen(t)}
+                      className="cursor-pointer border border-white/10 hover:border-white/25 bg-white/[0.02] hover:bg-white/[0.04] p-4 transition-colors"
+                    >
                       <div className="flex items-center justify-between">
+                        <span className="font-mono text-[10px] text-white/40">{t.ticket_no || `#${t.id.slice(-4).toUpperCase()}`}</span>
                         <span
                           className="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 border"
                           style={{ color: diff.color, borderColor: `${diff.color}55` }}
                         >
                           {diff.label}
                         </span>
-                        <span className="font-mono text-[10px] text-white/50 flex items-center gap-1">
-                          <Zap size={10} className="text-[#FBBF24]"/> +{t.points}
-                        </span>
                       </div>
                       <div className="font-heading font-bold text-sm mt-3 leading-snug">{t.title}</div>
-                      <p className="text-xs font-mono text-white/50 mt-1 line-clamp-2">{t.description}</p>
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {(t.skills || []).slice(0, 3).map((sk) => (
-                          <span key={sk} className="font-mono text-[10px] text-white/60 bg-white/5 border border-white/10 px-1.5 py-0.5">{sk}</span>
-                        ))}
+                      {t.customer_problem ? (
+                        <p className="text-xs font-mono text-white/50 mt-1 line-clamp-2">{t.customer_problem}</p>
+                      ) : (
+                        <p className="text-xs font-mono text-white/50 mt-1 line-clamp-2">{t.description}</p>
+                      )}
+                      <div className="mt-3 flex items-center justify-between">
+                        <div className="flex flex-wrap gap-1">
+                          {(t.skills || []).slice(0, 3).map((sk) => (
+                            <span key={sk} className="font-mono text-[10px] text-white/60 bg-white/5 border border-white/10 px-1.5 py-0.5">{sk}</span>
+                          ))}
+                        </div>
+                        <span className="font-mono text-[10px] text-white/50 flex items-center gap-1 shrink-0">
+                          <Zap size={10} className="text-[#FBBF24]"/>+{t.points}
+                        </span>
                       </div>
                       {t.assignee_name && (
                         <div className="mt-3 font-mono text-[10px] text-white/40">
                           @ <span className="text-white/80">{t.assignee_name}</span>
                         </div>
                       )}
-                      <div className="mt-4">
+                      <div className="mt-4" onClick={(e) => e.stopPropagation()}>
                         {col.key === "open" && joined && (
                           <button
                             data-testid={`task-claim-${t.id}`}
@@ -238,10 +253,21 @@ export default function StartupDetail() {
       </div>
 
       {submitTask && (
-        <SubmissionModal
+        <SubmitAndInterviewModal
           task={submitTask}
           onClose={() => setSubmitTask(null)}
-          onSubmitted={() => { setSubmitTask(null); loadAll(); }}
+          onDone={() => { setSubmitTask(null); loadAll(); }}
+        />
+      )}
+      {ticketOpen && (
+        <TicketDetailModal
+          ticket={ticketOpen}
+          joined={joined}
+          isAssignee={isAssignee(ticketOpen)}
+          onClose={() => setTicketOpen(null)}
+          onClaim={() => { const t = ticketOpen; setTicketOpen(null); claim(t.id); }}
+          onSubmit={() => { const t = ticketOpen; setTicketOpen(null); setSubmitTask(t); }}
+          onAskAI={() => { const t = ticketOpen; setTicketOpen(null); setAiTask(t); }}
         />
       )}
       {aiTask && (
@@ -257,91 +283,6 @@ export default function StartupDetail() {
         message={upgradePrompt?.message}
         feature={upgradePrompt?.feature}
       />
-    </div>
-  );
-}
-
-function SubmissionModal({ task, onClose, onSubmitted }) {
-  const [githubUrl, setGithubUrl] = useState("");
-  const [notes, setNotes] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      const { data } = await api.post(`/tasks/${task.id}/submit`, { github_url: githubUrl, notes });
-      toast.success("Submitted! Running mentor review…");
-      try {
-        await api.post(`/submissions/${data.id}/auto-approve`);
-        toast.success("Mentor Bot approved your PR. Task marked complete.");
-      } catch {}
-      onSubmitted();
-    } catch (e2) {
-      toast.error(formatApiErrorDetail(e2.response?.data?.detail));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-[#0A0A0A] border border-white/15">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-[#22D3EE]">// submit pull request</div>
-            <div className="font-heading text-xl font-bold mt-1 text-white">{task.title}</div>
-          </div>
-          <button
-            data-testid="submit-close"
-            onClick={onClose}
-            className="text-white/60 hover:text-white border border-white/15 hover:border-white/40 p-2 transition-colors"
-          >
-            <X size={16}/>
-          </button>
-        </div>
-        <form onSubmit={submit} className="p-6 space-y-5">
-          <div>
-            <label className="font-mono text-[10px] uppercase tracking-widest text-white/50">GitHub PR / Repo URL *</label>
-            <input
-              data-testid="submit-github-url"
-              type="url"
-              required
-              value={githubUrl}
-              onChange={(e) => setGithubUrl(e.target.value)}
-              placeholder="https://github.com/you/repo/pull/42"
-              className="w-full bg-transparent border-0 border-b border-white/15 focus:border-[#22D3EE] px-0 py-3 font-mono text-sm text-white placeholder:text-white/30 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="font-mono text-[10px] uppercase tracking-widest text-white/50">Notes for the mentor</label>
-            <textarea
-              data-testid="submit-notes"
-              rows={4}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="What you built, decisions you made, tradeoffs…"
-              className="w-full bg-transparent border border-white/15 focus:border-[#22D3EE] px-3 py-2 font-mono text-sm text-white placeholder:text-white/30 focus:outline-none mt-1"
-            />
-          </div>
-          <div className="border border-white/10 bg-white/[0.02] p-4 flex items-start gap-3">
-            <Sparkles size={16} className="text-[#22D3EE] mt-0.5"/>
-            <div className="text-xs font-mono text-white/60">
-              <span className="font-bold text-white">Mentor Bot</span> will auto-review and verify your submission. Approved submissions land on your verified profile.
-            </div>
-          </div>
-          <div className="flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="font-mono text-sm text-white/60 hover:text-white border border-white/15 hover:border-white/40 px-5 py-2.5 transition-colors">Cancel</button>
-            <button
-              data-testid="submit-confirm"
-              disabled={busy}
-              className="font-mono text-sm font-semibold bg-white text-[#0A0A0A] hover:bg-[#22D3EE] disabled:opacity-50 px-5 py-2.5 transition-colors"
-            >
-              {busy ? "Submitting…" : "Submit PR →"}
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }

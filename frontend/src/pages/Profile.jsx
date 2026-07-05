@@ -183,6 +183,38 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* Dimensional averages (from AI interviews) */}
+        {stats.dimensional_averages && (
+          <div className="mt-10">
+            <div className="font-mono text-sm text-[#22D3EE]">// how you work</div>
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-heading text-2xl font-bold tracking-tight mt-2">Engineering dimensions</h2>
+              <span className="font-mono text-xs text-white/40">
+                averaged across {stats.interviews_completed} AI interview{stats.interviews_completed === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { k: "understanding", label: "Understanding", color: "#22D3EE" },
+                { k: "architecture", label: "Architecture", color: "#A3E635" },
+                { k: "communication", label: "Communication", color: "#F472B6" },
+                { k: "delivery", label: "Delivery", color: "#FBBF24" },
+              ].map((d) => {
+                const v = stats.dimensional_averages[d.k] ?? 0;
+                return (
+                  <div key={d.k} className="border border-white/10 bg-white/[0.02] p-5">
+                    <div className="font-mono text-[10px] uppercase tracking-widest text-white/40">{d.label}</div>
+                    <div className="mt-1 font-heading text-3xl font-bold" style={{ color: d.color }}>{v}<span className="text-white/40 text-lg">/100</span></div>
+                    <div className="mt-3 h-1 bg-white/10 relative">
+                      <div className="absolute inset-y-0 left-0" style={{ width: `${v}%`, background: d.color }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Skills */}
         <div className="mt-10">
           <div className="font-mono text-sm text-[#22D3EE]">// verified skills</div>

@@ -850,6 +850,18 @@ async def my_profile(user=Depends(get_current_user)):
             points += t.get("points", 10)
     approved_count = sum(1 for s in subs if s.get("status") == "approved")
 
+    # Dimensional averages from interview scores
+    dim_totals = {"understanding": 0, "architecture": 0, "communication": 0, "delivery": 0}
+    dim_count = 0
+    for s in subs:
+        iv = s.get("interview") or {}
+        scores = iv.get("scores") or {}
+        if all(k in scores for k in dim_totals.keys()):
+            for k in dim_totals:
+                dim_totals[k] += int(scores[k])
+            dim_count += 1
+    dim_averages = {k: round(v / dim_count) for k, v in dim_totals.items()} if dim_count else None
+
     return {
         "user": serialize_user(user),
         "startups": startups,
@@ -859,6 +871,8 @@ async def my_profile(user=Depends(get_current_user)):
             "submissions_total": len(subs),
             "skills_earned": sorted(skills_set),
             "experience_points": points,
+            "dimensional_averages": dim_averages,
+            "interviews_completed": dim_count,
         },
     }
 
