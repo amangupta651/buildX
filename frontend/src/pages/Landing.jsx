@@ -62,19 +62,8 @@ export default function Landing() {
             maskImage: "radial-gradient(ellipse at center, black 30%, transparent 75%)",
           }}
         />
-        <div className="relative max-w-[1400px] mx-auto px-6 pt-24 pb-32 text-center">
-          {/* Terminal pill */}
-          <div className="inline-flex items-center gap-2 border border-white/15 bg-white/[0.03] rounded-full px-4 py-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22D3EE] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#22D3EE]"></span>
-            </span>
-            <span className="font-mono text-xs text-white/70">
-              <span className="text-white/40">v0.4.0</span> · onboarding 240 students this cohort
-            </span>
-          </div>
-
-          <h1 className="font-heading text-6xl sm:text-7xl md:text-8xl lg:text-[128px] font-bold tracking-tight leading-[0.95] mt-8 max-w-6xl mx-auto">
+        <div className="relative max-w-[1400px] mx-auto px-6 pt-32 pb-32 text-center">
+          <h1 className="font-heading text-6xl sm:text-7xl md:text-8xl lg:text-[128px] font-bold tracking-tight leading-[0.95] max-w-6xl mx-auto">
             Internship-grade work,
             <br />
             <span
