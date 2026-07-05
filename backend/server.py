@@ -405,13 +405,28 @@ def serialize_startup(doc: dict) -> dict:
 
 @api.get("/startups")
 async def list_startups():
-    cursor = db.startups.find({}).sort("created_at", -1)
+    startups = await db.startups.find({}).sort("created_at", -1).to_list(500)
+    if not startups:
+        return []
+    sids = [str(s["_id"]) for s in startups]
+    # Bulk aggregate counts
+    member_counts = {}
+    task_counts = {}
+    async for row in db.applications.aggregate([
+        {"$match": {"startup_id": {"$in": sids}, "status": "accepted"}},
+        {"$group": {"_id": "$startup_id", "n": {"$sum": 1}}},
+    ]):
+        member_counts[row["_id"]] = row["n"]
+    async for row in db.tasks.aggregate([
+        {"$match": {"startup_id": {"$in": sids}}},
+        {"$group": {"_id": "$startup_id", "n": {"$sum": 1}}},
+    ]):
+        task_counts[row["_id"]] = row["n"]
     out = []
-    async for s in cursor:
-        members = await db.applications.count_documents({"startup_id": str(s["_id"]), "status": "accepted"})
-        tasks = await db.tasks.count_documents({"startup_id": str(s["_id"])})
-        s["members_count"] = members
-        s["tasks_count"] = tasks
+    for s in startups:
+        sid = str(s["_id"])
+        s["members_count"] = member_counts.get(sid, 0)
+        s["tasks_count"] = task_counts.get(sid, 0)
         out.append(serialize_startup(s))
     return out
 
@@ -611,42 +626,46 @@ async def auto_approve(sub_id: str, user=Depends(get_current_user)):
 @api.get("/profile/me")
 async def my_profile(user=Depends(get_current_user)):
     uid = str(user["_id"])
-    # Startups joined
     apps = await db.applications.find({"user_id": uid, "status": "accepted"}).to_list(100)
-    startup_ids = [a["startup_id"] for a in apps]
-    startups = []
-    for sid in startup_ids:
-        s = await db.startups.find_one({"_id": ObjectId(sid)})
-        if s:
-            startups.append(serialize_startup(s))
-    # Submissions (approved only count toward verified experience)
     subs = await db.submissions.find({"user_id": uid}).sort("submitted_at", -1).to_list(200)
-    approved = [s for s in subs if s.get("status") == "approved"]
-    # Enrich with task title + startup name
+
+    # Bulk fetch startups + tasks referenced anywhere
+    startup_id_strs = list({a["startup_id"] for a in apps} | {s["startup_id"] for s in subs})
+    task_id_strs = list({s["task_id"] for s in subs})
+    startups_map = {}
+    tasks_map = {}
+    if startup_id_strs:
+        async for s in db.startups.find({"_id": {"$in": [ObjectId(x) for x in startup_id_strs]}}):
+            startups_map[str(s["_id"])] = s
+    if task_id_strs:
+        async for t in db.tasks.find({"_id": {"$in": [ObjectId(x) for x in task_id_strs]}}):
+            tasks_map[str(t["_id"])] = t
+
+    startups = [serialize_startup(startups_map[a["startup_id"]]) for a in apps if a["startup_id"] in startups_map]
+
     enriched = []
+    skills_set = set()
+    points = 0
     for s in subs:
-        t = await db.tasks.find_one({"_id": ObjectId(s["task_id"])})
-        st = await db.startups.find_one({"_id": ObjectId(s["startup_id"])})
+        t = tasks_map.get(s["task_id"])
+        st = startups_map.get(s["startup_id"])
         item = serialize_submission(s)
         item["task_title"] = t["title"] if t else ""
         item["task_points"] = t.get("points", 10) if t else 0
         item["startup_name"] = st["name"] if st else ""
         enriched.append(item)
-    # Skills earned
-    skills_set = set()
-    points = 0
-    for a in approved:
-        t = await db.tasks.find_one({"_id": ObjectId(a["task_id"])})
-        if t:
+        if s.get("status") == "approved" and t:
             for sk in t.get("skills", []):
                 skills_set.add(sk)
             points += t.get("points", 10)
+    approved_count = sum(1 for s in subs if s.get("status") == "approved")
+
     return {
         "user": serialize_user(user),
         "startups": startups,
         "submissions": enriched,
         "stats": {
-            "tasks_completed": len(approved),
+            "tasks_completed": approved_count,
             "submissions_total": len(subs),
             "skills_earned": sorted(skills_set),
             "experience_points": points,
@@ -658,18 +677,19 @@ async def my_profile(user=Depends(get_current_user)):
 async def my_certificate(user=Depends(get_current_user)):
     uid = str(user["_id"])
     apps = await db.applications.find({"user_id": uid, "status": "accepted"}).to_list(100)
-    startups = []
-    for a in apps:
-        s = await db.startups.find_one({"_id": ObjectId(a["startup_id"])})
-        if s:
-            startups.append(s["name"])
     subs = await db.submissions.find({"user_id": uid, "status": "approved"}).to_list(200)
+
+    startup_ids = [ObjectId(a["startup_id"]) for a in apps]
+    task_ids = [ObjectId(s["task_id"]) for s in subs]
+    startups = []
+    if startup_ids:
+        async for s in db.startups.find({"_id": {"$in": startup_ids}}):
+            startups.append(s["name"])
     skills_set = set()
     points = 0
     completed_tasks = []
-    for sub in subs:
-        t = await db.tasks.find_one({"_id": ObjectId(sub["task_id"])})
-        if t:
+    if task_ids:
+        async for t in db.tasks.find({"_id": {"$in": task_ids}}):
             completed_tasks.append(t["title"])
             for sk in t.get("skills", []):
                 skills_set.add(sk)
