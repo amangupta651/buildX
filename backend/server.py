@@ -7,6 +7,7 @@ load_dotenv(ROOT_DIR / '.env')
 import os
 import io
 import uuid
+import json
 import logging
 import bcrypt
 import jwt
@@ -23,6 +24,7 @@ from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
+from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
 
 # -----------------------------------------------------------------------------
 # Setup
@@ -33,6 +35,7 @@ db = client[os.environ['DB_NAME']]
 
 JWT_ALGORITHM = "HS256"
 JWT_SECRET = os.environ["JWT_SECRET"]
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
 app = FastAPI(title="buildX API")
 api = APIRouter(prefix="/api")
@@ -403,6 +406,33 @@ def serialize_startup(doc: dict) -> dict:
     }
 
 
+# -----------------------------------------------------------------------------
+# LLM helper — Claude Sonnet via Emergent LLM key
+# -----------------------------------------------------------------------------
+async def llm_json(system: str, user: str, session_id: str) -> dict:
+    """Call Claude, parse JSON output. Raises on failure so caller can fallback."""
+    chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=session_id,
+        system_message=system,
+    ).with_model("anthropic", "claude-sonnet-4-6")
+    out = ""
+    async for ev in chat.stream_message(UserMessage(text=user)):
+        if isinstance(ev, TextDelta):
+            out += ev.content
+        elif isinstance(ev, StreamDone):
+            break
+    txt = out.strip()
+    if txt.startswith("```"):
+        # strip ```json fences
+        inner = txt.split("```")
+        if len(inner) >= 2:
+            txt = inner[1]
+            if txt.lstrip().lower().startswith("json"):
+                txt = txt.split("json", 1)[1]
+    return json.loads(txt.strip())
+
+
 @api.get("/startups")
 async def list_startups():
     startups = await db.startups.find({}).sort("created_at", -1).to_list(500)
@@ -497,6 +527,11 @@ def serialize_task(doc: dict) -> dict:
         "assignee_id": doc.get("assignee_id"),
         "assignee_name": doc.get("assignee_name"),
         "points": doc.get("points", 10),
+        "ticket_no": doc.get("ticket_no", ""),
+        "customer_problem": doc.get("customer_problem", ""),
+        "acceptance_criteria": doc.get("acceptance_criteria", []),
+        "business_context": doc.get("business_context", ""),
+        "attachments": doc.get("attachments", []),
         "created_at": doc.get("created_at", now_utc()).isoformat() if isinstance(doc.get("created_at"), datetime) else doc.get("created_at"),
     }
 
@@ -574,6 +609,7 @@ def serialize_submission(doc: dict) -> dict:
         "notes": doc.get("notes", ""),
         "status": doc.get("status", "pending"),
         "feedback": doc.get("feedback", ""),
+        "interview": doc.get("interview"),  # {questions, scores, overall}
         "submitted_at": doc["submitted_at"].isoformat() if isinstance(doc.get("submitted_at"), datetime) else doc.get("submitted_at"),
     }
 
@@ -601,6 +637,160 @@ async def review_submission(sub_id: str, body: ReviewIn, user=Depends(get_curren
     await db.tasks.update_one({"_id": ObjectId(s["task_id"])}, {"$set": {"status": new_task_status}})
     updated = await db.submissions.find_one({"_id": s["_id"]})
     return serialize_submission(updated)
+
+
+# -----------------------------------------------------------------------------
+# Explain-Your-Code Interview (the anti-AI-cheat core of buildX)
+# -----------------------------------------------------------------------------
+class InterviewAnswersIn(BaseModel):
+    answers: List[str]  # one per question, same order
+
+
+def fallback_questions(t: dict) -> List[str]:
+    stack = ", ".join(t.get("skills", [])[:3]) or "your stack"
+    return [
+        f"Walk through your solution to '{t['title']}'. What was your key design decision and why?",
+        f"You used {stack}. If traffic scaled 100x tomorrow, what would break first — and how would you fix it?",
+        "Pick one function from your PR. Explain what it does, what could fail, and how you'd test it.",
+    ]
+
+
+def fallback_grade(answers: List[str]) -> dict:
+    lens = [len((a or "").strip()) for a in answers]
+    depth = min(100, sum(lens) // 4)
+    base = max(50, min(92, depth))
+    return {
+        "scores": {
+            "understanding": base,
+            "architecture": max(40, base - 5),
+            "communication": min(95, base + 3),
+            "delivery": max(45, base - 2),
+        },
+        "overall": base,
+        "feedback": "Answers received. This is a heuristic score — connect a real LLM key for AI-graded feedback.",
+        "strengths": ["Attempted every question", "Showed reasoning"],
+        "improvements": ["Add more concrete examples", "Reference specific lines of your code"],
+    }
+
+
+@api.post("/submissions/{sub_id}/interview/start")
+async def interview_start(sub_id: str, user=Depends(get_current_user)):
+    s = await db.submissions.find_one({"_id": ObjectId(sub_id)})
+    if not s:
+        raise HTTPException(404, "Submission not found")
+    if s["user_id"] != str(user["_id"]):
+        raise HTTPException(403, "Not your submission")
+    if s.get("interview"):
+        # Already generated — return same questions
+        return {"questions": s["interview"]["questions"]}
+    t = await db.tasks.find_one({"_id": ObjectId(s["task_id"])})
+    if not t:
+        raise HTTPException(404, "Ticket not found")
+
+    questions: List[str] = []
+    if EMERGENT_LLM_KEY:
+        try:
+            sys_prompt = (
+                "You are a senior staff engineer conducting a code-review follow-up interview for a junior "
+                "engineer who just submitted a pull request. Your job is to detect real understanding — "
+                "not memorization or AI-copy-paste. Ask 3 short, sharp questions grounded in the ticket "
+                "and the student's submission notes. One question must probe DESIGN CHOICES, one must probe "
+                "OPERATIONAL RISK (scale/failure), one must probe DEBUGGING/EDGE CASES. Reply ONLY with "
+                "valid JSON: {\"questions\": [\"q1\", \"q2\", \"q3\"]}"
+            )
+            user_prompt = (
+                f"TICKET TITLE: {t['title']}\n"
+                f"CUSTOMER PROBLEM: {t.get('customer_problem') or t.get('description','')}\n"
+                f"ACCEPTANCE CRITERIA: {'; '.join(t.get('acceptance_criteria', []))}\n"
+                f"TECH SKILLS: {', '.join(t.get('skills', []))}\n\n"
+                f"STUDENT'S PR URL: {s['github_url']}\n"
+                f"STUDENT'S NOTES: {s.get('notes','(none)')}"
+            )
+            data = await llm_json(sys_prompt, user_prompt, f"interview-{sub_id}")
+            qs = data.get("questions", [])
+            if isinstance(qs, list) and len(qs) >= 3:
+                questions = [str(q) for q in qs[:3]]
+        except Exception as e:
+            logger.warning("interview_start LLM failed: %s", e)
+
+    if not questions:
+        questions = fallback_questions(t)
+
+    interview = {"questions": questions, "answers": [], "scores": None, "overall": None, "generated_at": now_utc()}
+    await db.submissions.update_one({"_id": s["_id"]}, {"$set": {"interview": interview}})
+    return {"questions": questions}
+
+
+@api.post("/submissions/{sub_id}/interview/answer")
+async def interview_answer(sub_id: str, body: InterviewAnswersIn, user=Depends(get_current_user)):
+    s = await db.submissions.find_one({"_id": ObjectId(sub_id)})
+    if not s:
+        raise HTTPException(404, "Submission not found")
+    if s["user_id"] != str(user["_id"]):
+        raise HTTPException(403, "Not your submission")
+    interview = s.get("interview") or {}
+    questions: List[str] = interview.get("questions", [])
+    if not questions:
+        raise HTTPException(400, "Start the interview first")
+    if len(body.answers) < len(questions):
+        raise HTTPException(400, "Answer all questions")
+
+    t = await db.tasks.find_one({"_id": ObjectId(s["task_id"])})
+
+    result = None
+    if EMERGENT_LLM_KEY:
+        try:
+            qa_block = "\n\n".join(
+                f"Q{i+1}: {q}\nA{i+1}: {(body.answers[i] or '').strip() or '(no answer)'}"
+                for i, q in enumerate(questions)
+            )
+            sys_prompt = (
+                "You are a senior staff engineer grading a code-review interview. Grade the student on 4 "
+                "dimensions from 0-100: understanding (do they truly grasp the problem?), architecture "
+                "(quality of design reasoning), communication (clarity & precision), delivery "
+                "(pragmatism about shipping). Be fair but rigorous — vague or evasive answers get low "
+                "understanding scores even if they sound confident. Reply ONLY with valid JSON of shape: "
+                "{\"scores\":{\"understanding\":N,\"architecture\":N,\"communication\":N,\"delivery\":N},"
+                "\"overall\":N,\"feedback\":\"1-2 sentences summarising performance\","
+                "\"strengths\":[\"...\",\"...\"],\"improvements\":[\"...\",\"...\"]}"
+            )
+            user_prompt = (
+                f"TICKET: {t['title'] if t else ''}\n"
+                f"CUSTOMER PROBLEM: {(t or {}).get('customer_problem', '')}\n\n"
+                f"INTERVIEW:\n{qa_block}"
+            )
+            data = await llm_json(sys_prompt, user_prompt, f"interview-grade-{sub_id}")
+            scores = data.get("scores", {})
+            if all(k in scores for k in ("understanding", "architecture", "communication", "delivery")):
+                result = data
+        except Exception as e:
+            logger.warning("interview_answer LLM failed: %s", e)
+
+    if result is None:
+        result = fallback_grade(body.answers)
+
+    scores = result["scores"]
+    overall = int(result.get("overall") or sum(scores.values()) / 4)
+    interview_out = {
+        "questions": questions,
+        "answers": body.answers[:len(questions)],
+        "scores": scores,
+        "overall": overall,
+        "feedback": result.get("feedback", ""),
+        "strengths": result.get("strengths", []),
+        "improvements": result.get("improvements", []),
+        "graded_at": now_utc(),
+    }
+    new_sub_status = "approved" if overall >= 60 else "rejected"
+    new_task_status = "completed" if new_sub_status == "approved" else "in_progress"
+    await db.submissions.update_one(
+        {"_id": s["_id"]},
+        {"$set": {"interview": interview_out, "status": new_sub_status, "feedback": result.get("feedback", "")}},
+    )
+    await db.tasks.update_one({"_id": ObjectId(s["task_id"])}, {"$set": {"status": new_task_status}})
+
+    updated = await db.submissions.find_one({"_id": s["_id"]})
+    return {"submission": serialize_submission(updated), "interview": interview_out}
 
 
 # Self-review demo helper: lets the assignee mark their submission as "auto-approved" via mentor bot
@@ -785,9 +975,59 @@ SEED_STARTUPS = [
         "roles_open": ["Robotics Engineer", "Frontend Engineer"],
         "logo_url": "https://images.unsplash.com/photo-1689443111384-1cf214df988a?w=400&q=80",
         "tasks": [
-            {"title": "Build inverse kinematics solver", "description": "Implement a 6-DOF inverse kinematics solver in Python with unit tests.", "difficulty": "hard", "skills": ["Python", "Linear Algebra", "ROS2"], "points": 50},
-            {"title": "Create web cockpit dashboard", "description": "Design a React dashboard that streams arm telemetry over WebSocket.", "difficulty": "medium", "skills": ["React", "WebSocket"], "points": 30},
-            {"title": "Write firmware unit tests", "description": "Add pytest coverage for the motor control firmware abstractions.", "difficulty": "easy", "skills": ["Python", "Pytest"], "points": 15},
+            {
+                "ticket_no": "HLX-101",
+                "title": "Build inverse kinematics solver",
+                "description": "Implement a 6-DOF inverse kinematics solver in Python with unit tests.",
+                "difficulty": "hard", "points": 50,
+                "skills": ["Python", "Linear Algebra", "ROS2"],
+                "customer_problem": "Lab technicians report the arm 'freezes' when asked to pick up sample vials at odd angles — because our current solver can't find a valid joint configuration.",
+                "acceptance_criteria": [
+                    "Given a target pose (x,y,z,roll,pitch,yaw), return joint angles in <50ms",
+                    "Reject unreachable poses with a clear error",
+                    "Unit tests cover 20+ poses across the workspace",
+                    "No numerical instability near singularities",
+                ],
+                "business_context": "Biolab customers are threatening to churn if we can't pick up vials from tilted racks. This unblocks 3 pilot contracts (~$120k ARR).",
+                "attachments": [
+                    {"label": "Arm kinematics diagram", "url": "https://en.wikipedia.org/wiki/Inverse_kinematics", "type": "spec"},
+                    {"label": "ROS2 URDF file", "url": "#", "type": "asset"},
+                ],
+            },
+            {
+                "ticket_no": "HLX-102",
+                "title": "Create web cockpit dashboard",
+                "description": "Design a React dashboard that streams arm telemetry over WebSocket.",
+                "difficulty": "medium", "points": 30,
+                "skills": ["React", "WebSocket"],
+                "customer_problem": "Operators can't tell if the arm is stalled or just paused — they need a live view of joint torques and camera feed.",
+                "acceptance_criteria": [
+                    "Live joint-torque chart updating at 10Hz",
+                    "Reconnects automatically if WebSocket drops",
+                    "Shows arm status: IDLE / MOVING / ERROR",
+                    "Emergency stop button visible above the fold",
+                ],
+                "business_context": "Every 1min of downtime = 3 failed experiments. Ops team wants this on the wall monitor.",
+                "attachments": [
+                    {"label": "Figma cockpit design", "url": "https://www.figma.com", "type": "design"},
+                    {"label": "WebSocket API spec", "url": "#", "type": "api"},
+                ],
+            },
+            {
+                "ticket_no": "HLX-103",
+                "title": "Write firmware unit tests",
+                "description": "Add pytest coverage for the motor control firmware abstractions.",
+                "difficulty": "easy", "points": 15,
+                "skills": ["Python", "Pytest"],
+                "customer_problem": "Regressions have shipped twice this quarter because motor drivers have no test coverage.",
+                "acceptance_criteria": [
+                    "≥80% line coverage on motor_control.py",
+                    "All hardware calls mocked (no physical hardware in CI)",
+                    "Tests run in <5 seconds",
+                ],
+                "business_context": "Without tests, every firmware release is a coin flip. Blocks our v0.4 launch.",
+                "attachments": [{"label": "Coverage report (latest)", "url": "#", "type": "asset"}],
+            },
         ],
     },
     {
@@ -800,9 +1040,57 @@ SEED_STARTUPS = [
         "roles_open": ["Backend Engineer", "Data Engineer"],
         "logo_url": "https://images.unsplash.com/photo-1638864616270-64041b699a50?w=400&q=80",
         "tasks": [
-            {"title": "Design carbon factor schema", "description": "Model emission factors for >50 industrial materials in Postgres.", "difficulty": "medium", "skills": ["Postgres", "Data Modeling"], "points": 25},
-            {"title": "Build emissions REST API", "description": "FastAPI endpoint that returns CO2e for a bill of materials.", "difficulty": "medium", "skills": ["FastAPI", "Python"], "points": 30},
-            {"title": "Add JWT auth to public API", "description": "Implement scoped API keys with rate limits.", "difficulty": "hard", "skills": ["Python", "Security", "JWT"], "points": 40},
+            {
+                "ticket_no": "STR-201",
+                "title": "Design carbon factor schema",
+                "description": "Model emission factors for >50 industrial materials in Postgres.",
+                "difficulty": "medium", "points": 25,
+                "skills": ["Postgres", "Data Modeling"],
+                "customer_problem": "Our first pilot (a battery manufacturer) needs to attribute CO2e per BOM line. Current CSV import is a mess and can't handle unit conversions (kg vs tonne, per-part vs per-kg).",
+                "acceptance_criteria": [
+                    "Schema supports material → factor (kgCO2e/unit) with citation",
+                    "Handles unit conversion (kg ↔ tonne, m² ↔ m³ where applicable)",
+                    "Migration script + seed of 50 common materials",
+                    "Index supports lookup by material_code in <10ms",
+                ],
+                "business_context": "Enables our first paying customer to close their Series-B sustainability report. Deal size: ₹18L ARR.",
+                "attachments": [
+                    {"label": "GHG Protocol factors PDF", "url": "https://ghgprotocol.org", "type": "spec"},
+                    {"label": "Current CSV import (broken)", "url": "#", "type": "asset"},
+                ],
+            },
+            {
+                "ticket_no": "STR-202",
+                "title": "Build emissions REST API",
+                "description": "FastAPI endpoint that returns CO2e for a bill of materials.",
+                "difficulty": "medium", "points": 30,
+                "skills": ["FastAPI", "Python"],
+                "customer_problem": "Customers want to POST their BOM JSON and get back a per-line CO2e breakdown they can drop into their reporting tool.",
+                "acceptance_criteria": [
+                    "POST /v1/emissions accepts {items:[{material_code, qty, unit}]}",
+                    "Returns per-line + total CO2e with citation source",
+                    "Rejects unknown material_code with 422 + suggestion",
+                    "p95 latency <200ms for 100-item BOMs",
+                ],
+                "business_context": "The API IS the product. Anything above p95=200ms means we lose the enterprise deal.",
+                "attachments": [{"label": "OpenAPI spec (draft)", "url": "#", "type": "api"}],
+            },
+            {
+                "ticket_no": "STR-203",
+                "title": "Add JWT auth to public API",
+                "description": "Implement scoped API keys with rate limits.",
+                "difficulty": "hard", "points": 40,
+                "skills": ["Python", "Security", "JWT"],
+                "customer_problem": "We're leaking free access — anyone with the URL can call the emissions API. Enterprise contracts require scoped keys and audit logs.",
+                "acceptance_criteria": [
+                    "API key issuance with scopes (read / write / admin)",
+                    "Per-key rate limit (default 60 req/min)",
+                    "Audit log persists key_id + endpoint + timestamp",
+                    "Key rotation without downtime",
+                ],
+                "business_context": "Blocks our SOC2-lite compliance track. Two enterprise deals stalled waiting for this.",
+                "attachments": [{"label": "Security review checklist", "url": "#", "type": "spec"}],
+            },
         ],
     },
     {
@@ -815,8 +1103,41 @@ SEED_STARTUPS = [
         "roles_open": ["Mobile Engineer", "Security Engineer"],
         "logo_url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&q=80",
         "tasks": [
-            {"title": "Implement E2E encryption flow", "description": "Design key-exchange + envelope encryption for patient documents.", "difficulty": "hard", "skills": ["Cryptography", "TypeScript"], "points": 50},
-            {"title": "Patient timeline mobile screen", "description": "Build the patient timeline UI in React Native with offline sync.", "difficulty": "medium", "skills": ["React Native", "TypeScript"], "points": 30},
+            {
+                "ticket_no": "CIT-301",
+                "title": "Implement E2E encryption flow",
+                "description": "Design key-exchange + envelope encryption for patient documents.",
+                "difficulty": "hard", "points": 50,
+                "skills": ["Cryptography", "TypeScript"],
+                "customer_problem": "Patients are refusing to upload documents because our servers can decrypt them. We need true zero-knowledge storage.",
+                "acceptance_criteria": [
+                    "Client-side key generation (never leaves device)",
+                    "Envelope encryption: doc key → encrypted with patient master key",
+                    "Server stores only ciphertext + metadata",
+                    "Sharing with a doctor uses their public key (re-encrypt at rest)",
+                ],
+                "business_context": "Without E2E, we can't sell to hospital systems (they demand it in their infosec review).",
+                "attachments": [
+                    {"label": "libsodium docs", "url": "https://libsodium.gitbook.io", "type": "spec"},
+                    {"label": "Threat model doc", "url": "#", "type": "spec"},
+                ],
+            },
+            {
+                "ticket_no": "CIT-302",
+                "title": "Patient timeline mobile screen",
+                "description": "Build the patient timeline UI in React Native with offline sync.",
+                "difficulty": "medium", "points": 30,
+                "skills": ["React Native", "TypeScript"],
+                "customer_problem": "Patients want to scroll their full medical history like a chat thread — but the app dies on flaky hospital Wi-Fi.",
+                "acceptance_criteria": [
+                    "Timeline paginates in reverse-chronological order",
+                    "Fully functional offline (reads from local encrypted store)",
+                    "Background sync when connection returns",
+                    "Handles 5k+ items without jank",
+                ],
+                "business_context": "Retention is bad — 40% of first-time users bounce because the app hangs. Fixing this is a P0.",
+                "attachments": [{"label": "Figma timeline design", "url": "#", "type": "design"}],
+            },
         ],
     },
     {
@@ -829,9 +1150,54 @@ SEED_STARTUPS = [
         "roles_open": ["ML Engineer", "Full-Stack Engineer"],
         "logo_url": "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=400&q=80",
         "tasks": [
-            {"title": "Build RAG eval harness", "description": "Implement a reproducible evaluation harness for retrieval-augmented generation.", "difficulty": "hard", "skills": ["Python", "PyTorch", "Evals"], "points": 45},
-            {"title": "SOP ingestion pipeline", "description": "Pipeline that parses PDF SOPs into structured chunks.", "difficulty": "medium", "skills": ["Python", "PDF parsing"], "points": 25},
-            {"title": "Operator chat UI", "description": "Streaming chat UI for factory operators.", "difficulty": "easy", "skills": ["React", "SSE"], "points": 20},
+            {
+                "ticket_no": "FRG-401",
+                "title": "Build RAG eval harness",
+                "description": "Implement a reproducible evaluation harness for retrieval-augmented generation.",
+                "difficulty": "hard", "points": 45,
+                "skills": ["Python", "PyTorch", "Evals"],
+                "customer_problem": "Ops leads at customer factories don't trust our copilot's answers because we can't show 'this got 92% on our eval set' — we just say 'trust us'.",
+                "acceptance_criteria": [
+                    "Runs the same eval set across N model versions",
+                    "Metrics: exact-match, semantic-similarity, retrieval-recall@k",
+                    "CI-friendly (JSON + JUnit output)",
+                    "Regression detection when a new version drops below threshold",
+                ],
+                "business_context": "Two Fortune-500 pilots gated on 'show us your eval numbers.' No eval → no PO.",
+                "attachments": [{"label": "Example eval set (JSONL)", "url": "#", "type": "asset"}],
+            },
+            {
+                "ticket_no": "FRG-402",
+                "title": "SOP ingestion pipeline",
+                "description": "Pipeline that parses PDF SOPs into structured chunks.",
+                "difficulty": "medium", "points": 25,
+                "skills": ["Python", "PDF parsing"],
+                "customer_problem": "Customers hand us 200-page SOP PDFs and our current parser mangles tables + numbered lists — the copilot answers get garbled context.",
+                "acceptance_criteria": [
+                    "Extracts headings, paragraphs, tables, numbered steps as structured JSON",
+                    "Preserves the section hierarchy",
+                    "Handles multi-column layouts",
+                    "Processes 200-page PDF in <30 seconds",
+                ],
+                "business_context": "Every day this stays broken, one more customer says 'the AI is wrong' and considers churning.",
+                "attachments": [{"label": "Example customer SOP", "url": "#", "type": "asset"}],
+            },
+            {
+                "ticket_no": "FRG-403",
+                "title": "Operator chat UI",
+                "description": "Streaming chat UI for factory operators.",
+                "difficulty": "easy", "points": 20,
+                "skills": ["React", "SSE"],
+                "customer_problem": "Operators wear gloves and can't type long questions — they want big buttons, streaming responses, and voice input on tablets.",
+                "acceptance_criteria": [
+                    "Streams tokens as they arrive (SSE)",
+                    "Voice-to-text input working on iPad Safari",
+                    "Big-touch buttons (min 44px)",
+                    "Works offline: shows queued question with retry",
+                ],
+                "business_context": "Adoption blocker on the shop floor. Operators literally won't use it if they have to type.",
+                "attachments": [{"label": "Operator UX research", "url": "#", "type": "spec"}],
+            },
         ],
     },
     {
@@ -844,8 +1210,38 @@ SEED_STARTUPS = [
         "roles_open": ["Backend Engineer", "Maps Engineer"],
         "logo_url": "https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=400&q=80",
         "tasks": [
-            {"title": "Charging-window optimizer", "description": "Implement an optimizer that picks the cheapest charging window per vehicle.", "difficulty": "hard", "skills": ["Go", "Optimization"], "points": 45},
-            {"title": "Fleet map view", "description": "Mapbox view showing live fleet positions with clustering.", "difficulty": "medium", "skills": ["React", "Mapbox"], "points": 30},
+            {
+                "ticket_no": "BCN-501",
+                "title": "Charging-window optimizer",
+                "description": "Implement an optimizer that picks the cheapest charging window per vehicle.",
+                "difficulty": "hard", "points": 45,
+                "skills": ["Go", "Optimization"],
+                "customer_problem": "A 50-van last-mile fleet is burning 40% more on electricity than needed because vans charge whenever they're plugged in — regardless of grid pricing or route needs.",
+                "acceptance_criteria": [
+                    "Given (vehicle SoC, route start, grid price curve, target SoC), return charge schedule",
+                    "Optimizes for lowest total cost while meeting SoC deadline",
+                    "Runs in <2s for 100 vehicles",
+                    "Handles constraint: 'must not fully drain grid connection'",
+                ],
+                "business_context": "First customer signs a 3-year deal if we can show 20% savings in the pilot.",
+                "attachments": [{"label": "Grid pricing feed spec", "url": "#", "type": "spec"}],
+            },
+            {
+                "ticket_no": "BCN-502",
+                "title": "Fleet map view",
+                "description": "Mapbox view showing live fleet positions with clustering.",
+                "difficulty": "medium", "points": 30,
+                "skills": ["React", "Mapbox"],
+                "customer_problem": "Fleet ops managers currently open 50 separate tabs to track each vehicle. They want one live map with clustering + charging status.",
+                "acceptance_criteria": [
+                    "Live positions from WebSocket feed",
+                    "Cluster markers when zoomed out (>50 points)",
+                    "Color-code by state: driving / charging / idle / low-battery",
+                    "Click cluster → zooms + expands",
+                ],
+                "business_context": "Ops managers said 'give us the map or we go back to spreadsheets.' Retention driver.",
+                "attachments": [{"label": "Mapbox GL JS docs", "url": "https://docs.mapbox.com", "type": "spec"}],
+            },
         ],
     },
 ]
@@ -863,16 +1259,46 @@ async def seed_data():
         for t in tasks:
             await db.tasks.insert_one({
                 "startup_id": sid,
+                "ticket_no": t.get("ticket_no", ""),
                 "title": t["title"],
                 "description": t["description"],
                 "difficulty": t["difficulty"],
                 "skills": t["skills"],
                 "points": t["points"],
+                "customer_problem": t.get("customer_problem", ""),
+                "acceptance_criteria": t.get("acceptance_criteria", []),
+                "business_context": t.get("business_context", ""),
+                "attachments": t.get("attachments", []),
                 "status": "open",
                 "assignee_id": None,
                 "assignee_name": None,
                 "created_at": now_utc(),
             })
+
+
+async def reseed_rich_tickets():
+    """One-time upgrade: back-fill rich ticket fields onto existing seeded tasks."""
+    for s in SEED_STARTUPS:
+        startup_doc = await db.startups.find_one({"name": s["name"]})
+        if not startup_doc:
+            continue
+        sid = str(startup_doc["_id"])
+        for t in s.get("tasks", []):
+            existing = await db.tasks.find_one({"startup_id": sid, "title": t["title"]})
+            if not existing:
+                continue
+            # Only patch if the rich fields are missing
+            if not existing.get("customer_problem"):
+                await db.tasks.update_one(
+                    {"_id": existing["_id"]},
+                    {"$set": {
+                        "ticket_no": t.get("ticket_no", ""),
+                        "customer_problem": t.get("customer_problem", ""),
+                        "acceptance_criteria": t.get("acceptance_criteria", []),
+                        "business_context": t.get("business_context", ""),
+                        "attachments": t.get("attachments", []),
+                    }},
+                )
 
 
 async def seed_admin():
@@ -922,6 +1348,7 @@ async def startup_event():
     await db.submissions.create_index("user_id")
     await seed_admin()
     await seed_data()
+    await reseed_rich_tickets()
     logger.info("buildX backend ready.")
 
 
