@@ -110,27 +110,6 @@ export default function Landing() {
             </Link>
           </div>
         </div>
-
-        {/* Terminal decoration bottom-left */}
-        <div className="max-w-[1400px] mx-auto px-6 pb-16">
-          <div className="max-w-md border border-white/10 bg-black/40 shadow-2xl">
-            <div className="flex items-center gap-1.5 px-4 py-2 border-b border-white/10">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#FF605C]" />
-              <span className="w-2.5 h-2.5 rounded-full bg-[#FFBD44]" />
-              <span className="w-2.5 h-2.5 rounded-full bg-[#00CA4E]" />
-              <span className="ml-3 font-mono text-[11px] text-white/40">~/buildx/profile.json</span>
-            </div>
-            <pre className="p-4 font-mono text-[12px] text-white/70 leading-relaxed">
-{`{
-  "student": "alex.rivera",
-  "startups": ["helix", "forge-ai"],
-  "prs_merged": 7,
-  "skills_verified": ["React", "ROS2", "PyTorch"],
-  "cert": "LP-2026-A4F9" ✓
-}`}
-            </pre>
-          </div>
-        </div>
       </section>
 
       {/* HOW IT WORKS */}
