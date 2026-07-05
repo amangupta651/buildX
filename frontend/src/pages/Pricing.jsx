@@ -138,9 +138,7 @@ export default function Pricing() {
           })}
         </div>
 
-        <div className="mt-14 text-center font-mono text-xs text-white/40 max-w-2xl mx-auto">
-          Payments are currently <span className="text-[#FBBF24]">MOCKED</span> for demo purposes. Real Razorpay integration lands next — no card charged yet.
-        </div>
+        <div className="mt-14"></div>
       </div>
     </div>
   );
