@@ -626,10 +626,14 @@ def serialize_task(doc: dict) -> dict:
 
 
 @api.get("/tasks")
-async def list_tasks(startup_id: Optional[str] = None):
+async def list_tasks(startup_id: Optional[str] = None, stack: Optional[str] = None):
     q = {}
     if startup_id:
         q["startup_id"] = startup_id
+    if stack:
+        stack_values = [s.strip() for s in stack.split(",") if s.strip()]
+        if stack_values:
+            q["skills"] = {"$in": stack_values}
     cursor = db.tasks.find(q).sort("created_at", -1).limit(500)
     return [serialize_task(t) async for t in cursor]
 
@@ -1240,6 +1244,53 @@ SEED_STARTUPS = [
                 ],
                 "business_context": "Retention is bad — 40% of first-time users bounce because the app hangs. Fixing this is a P0.",
                 "attachments": [{"label": "Figma timeline design", "url": "#", "type": "design"}],
+            },
+        ],
+    },
+    {
+        "name": "Atlas Systems",
+        "tagline": "Modern supply chain tools for enterprise manufacturing.",
+        "description": "Atlas builds inventory and order orchestration systems for factories using Java microservices. We're hiring Java engineers to own resilient backend services.",
+        "industry": "Supply Chain",
+        "stage": "Seed",
+        "tech_stack": ["Java", "Spring Boot", "Postgres", "React"],
+        "roles_open": ["Backend Engineer", "Platform Engineer"],
+        "logo_url": "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400&q=80",
+        "tasks": [
+            {
+                "ticket_no": "ATL-601",
+                "title": "Build inventory reservation service",
+                "description": "Create a Spring Boot microservice that reserves inventory with strong consistency and retry-safe idempotency.",
+                "difficulty": "hard", "points": 40,
+                "skills": ["Java", "Spring Boot", "Postgres"],
+                "customer_problem": "Orders occasionally sell the same part twice because our reservation workflow is not transactionally safe across services.",
+                "acceptance_criteria": [
+                    "Reserve inventory with a single transaction",
+                    "Support idempotent retry for duplicate order requests",
+                    "Expose REST API with proper 409 conflict handling",
+                    "Add integration tests covering concurrent reservation attempts",
+                ],
+                "business_context": "Fixing this prevents lost shipments and expensive manual reconciliation for our largest manufacturing customers.",
+                "attachments": [
+                    {"label": "Reservation API contract", "url": "#", "type": "api"},
+                    {"label": "Database schema notes", "url": "#", "type": "spec"},
+                ],
+            },
+            {
+                "ticket_no": "ATL-602",
+                "title": "Add Java API integration tests",
+                "description": "Write JUnit + Spring test coverage for our order fulfillment API.",
+                "difficulty": "medium", "points": 25,
+                "skills": ["Java", "JUnit", "Spring Boot"],
+                "customer_problem": "Customers demand higher reliability from our order API, but our regression coverage is incomplete.",
+                "acceptance_criteria": [
+                    "Cover success, validation failure, and retry paths",
+                    "Run tests in <10 seconds",
+                    "Mock external warehouse service responses",
+                    "CI pipeline fails if coverage drops below 85%",
+                ],
+                "business_context": "This makes our platform credible for enterprise pilots and reduces shipping incidents.",
+                "attachments": [{"label": "Existing API spec", "url": "#", "type": "spec"}],
             },
         ],
     },

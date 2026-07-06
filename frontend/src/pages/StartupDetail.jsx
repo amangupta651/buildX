@@ -41,15 +41,19 @@ export default function StartupDetail() {
   const [upgradePrompt, setUpgradePrompt] = useState(null);
 
   const loadAll = useCallback(async () => {
+    const taskUrl = user?.stack?.length
+      ? `/tasks?startup_id=${id}&stack=${encodeURIComponent(user.stack.join(","))}`
+      : `/tasks?startup_id=${id}`;
+
     const [s, t, m] = await Promise.all([
       api.get(`/startups/${id}`),
-      api.get(`/tasks?startup_id=${id}`),
+      api.get(taskUrl),
       api.get(`/startups/${id}/membership`).catch(() => ({ data: { joined: false } })),
     ]);
     setStartup(s.data);
     setTasks(t.data);
     setJoined(m.data.joined);
-  }, [id]);
+  }, [id, user?.stack]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 

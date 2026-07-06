@@ -64,7 +64,7 @@ export default function Landing() {
         />
         <div className="relative max-w-[1400px] mx-auto px-6 pt-32 pb-32 text-center">
           <h1 className="font-heading text-6xl sm:text-7xl md:text-8xl lg:text-[128px] font-bold tracking-tight leading-[0.95] max-w-6xl mx-auto">
-            Internship-grade work,
+            Build before
             <br />
             <span
               className="bg-clip-text text-transparent"
@@ -73,12 +73,12 @@ export default function Landing() {
                   "linear-gradient(90deg, #22D3EE 0%, #67E8F9 40%, #F0F9FF 100%)",
               }}
             >
-              without the internship.
+              you&apos;re hired.
             </span>
           </h1>
 
           <p className="mt-10 max-w-2xl mx-auto text-base sm:text-lg text-white/60 leading-relaxed font-mono">
-            The place where students become industry-ready by building real products together.
+            Join AI-powered virtual startups, build real products, and earn verified experience employers can trust.
           </p>
 
           <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
