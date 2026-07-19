@@ -5,7 +5,9 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import RegisterStack from "@/pages/RegisterStack";
 import Dashboard from "@/pages/Dashboard";
+import Tickets from "@/pages/Tickets";
 import Startups from "@/pages/Startups";
 import StartupDetail from "@/pages/StartupDetail";
 import Profile from "@/pages/Profile";
@@ -27,6 +29,23 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function StackRequiredRoute({ children }) {
+  const { user } = useAuth();
+  const loc = useLocation();
+  if (user === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="overline">LOADING //</div>
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" state={{ from: loc.pathname }} replace />;
+  if (!user.stack || user.stack.length === 0) {
+    return <Navigate to="/register-stack" replace />;
+  }
+  return children;
+}
+
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => window.scrollTo(0, 0), [pathname]);
@@ -43,7 +62,9 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/register-stack" element={<ProtectedRoute><RegisterStack /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<StackRequiredRoute><Dashboard /></StackRequiredRoute>} />
+          <Route path="/tickets" element={<StackRequiredRoute><Tickets /></StackRequiredRoute>} />
           <Route path="/startups" element={<ProtectedRoute><Startups /></ProtectedRoute>} />
           <Route path="/startups/:id" element={<ProtectedRoute><StartupDetail /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
